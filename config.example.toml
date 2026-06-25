@@ -1,0 +1,64 @@
+# Configuración de STT Dictation.
+# Copia este fichero a "config.toml" y ajústalo. config.toml está en .gitignore.
+
+[engine]
+# Backend de transcripción: "local" (faster-whisper) o "openai" (API).
+backend = "local"
+# Idioma del audio en formato ISO-639-1 ("es", "en", ...) o "auto" para autodetectar.
+language = "es"
+
+[local]
+# Modelo de faster-whisper. "auto" elige según el hardware detectado:
+#   - con GPU CUDA  -> large-v3-turbo
+#   - solo CPU      -> small
+# Valores válidos: tiny, base, small, medium, large-v3, large-v3-turbo,
+#                  distil-large-v3, distil-small.en, ... o "auto".
+model = "auto"
+# Dispositivo: "auto" (detecta GPU), "cuda" o "cpu".
+device = "auto"
+# Precisión de cómputo: "auto", "int8", "int8_float16", "float16", "float32".
+compute_type = "auto"
+
+[openai]
+# Modelo de la API: "gpt-4o-transcribe", "gpt-4o-mini-transcribe" o "whisper-1".
+model = "gpt-4o-transcribe"
+# Nombre de la variable de entorno donde está la API key (NO se pone la key aquí).
+api_key_env = "OPENAI_API_KEY"
+
+[hotkey]
+# Atajos globales separados para cada modo. Sintaxis de la librería "keyboard".
+toggle = "ctrl+alt+space"      # pulsar para empezar / parar (o auto-stop por silencio)
+push_to_talk = "ctrl+alt+v"    # mantener pulsado mientras hablas
+# Modo por defecto si se usa una activación genérica: "toggle" o "push_to_talk".
+default_mode = "toggle"
+
+[audio]
+sample_rate = 16000            # Whisper trabaja a 16 kHz
+channels = 1
+# Tiempo de silencio (ms) tras el cual se corta automáticamente en modo toggle.
+silence_timeout_ms = 1500
+# Usar VAD (detección de actividad de voz) para recortar silencios.
+use_vad = true
+
+[injection]
+# Cómo insertar el texto en la ventana con foco: "clipboard" (Ctrl+V) o "type" (teclear).
+method = "clipboard"
+# Restaurar el contenido previo del portapapeles tras pegar.
+restore_clipboard = true
+# Retardo (ms) antes de pegar, para dar tiempo a que la ventana recupere el foco.
+paste_delay_ms = 80
+
+[dictionary]
+# Términos que se pasan como contexto a Whisper para mejorar nombres propios.
+terms = ["Anthropic", "Kubernetes", "Grafana"]
+
+# Sustituciones exactas/fuzzy aplicadas tras la transcripción ("mal" = "bien").
+[dictionary.replacements]
+"anthropik" = "Anthropic"
+"cubernetes" = "Kubernetes"
+
+[logging]
+# Nivel: DEBUG, INFO, WARNING, ERROR.
+level = "INFO"
+# Carpeta donde se escriben los logs (relativa al directorio de trabajo).
+dir = "logs"

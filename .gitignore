@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+*.spec
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# Config local con secretos / preferencias del usuario
+config.toml
+config.local.toml
+
+# Modelos de Whisper descargados (pesan mucho)
+models/
+*.bin
+*.pt
+
+# Logs e historial
+logs/
+*.log
+history/
+
+# IDE / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Tests / cobertura
+.pytest_cache/
+.coverage
+htmlcov/

@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stt-dictation"
+version = "0.1.0"
+description = "Dictado por voz para Windows con Whisper (local o API de OpenAI), atajo global e inyección de texto en el foco."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "fjgca" }]
+
+# Dependencias del núcleo (transcripción y audio).
+# Las específicas de Windows (atajos, portapapeles, bandeja) van en el extra [windows].
+dependencies = [
+    "faster-whisper>=1.0.0",
+    "sounddevice>=0.4.6",
+    "numpy>=1.26",
+    "openai>=1.30",
+    "rapidfuzz>=3.6",
+]
+
+[project.optional-dependencies]
+# Instalar en Windows nativo:  pip install -e ".[windows]"
+windows = [
+    "keyboard>=0.13.5",     # atajos globales
+    "pyperclip>=1.8.2",     # portapapeles
+    "pystray>=0.19",        # icono en bandeja
+    "Pillow>=10.0",         # iconos para pystray
+    "keyring>=24.0",        # almacenar la API key de forma segura
+]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.4",
+]
+
+[project.scripts]
+stt = "stt.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
