@@ -1,8 +1,8 @@
 """Backend remoto con la API de transcripción de OpenAI.
 
-Esbozo de Fase 0: estructura y manejo de credenciales definidos; el envío real
-del audio se completa en Fase 3. La API key se lee de una variable de entorno
-(o del almacén seguro de Windows vía keyring), nunca del fichero de config.
+La API key se lee de una variable de entorno (o del almacén seguro de Windows
+vía keyring), nunca del fichero de config. Antes de enviar, se recortan los
+silencios para reducir la duración facturada.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from stt.audio.silence import trim_silence
 from stt.transcribe.base import TranscriptionResult
 
 if TYPE_CHECKING:
@@ -82,6 +83,18 @@ class OpenAIBackend:
             raise RuntimeError("Backend OpenAI no inicializado: llama a load() primero.")
 
         started = time.monotonic()
+
+        if self._cfg.openai.trim_silence and audio.size:
+            original_s = audio.size / sample_rate
+            audio = trim_silence(audio, sample_rate)
+            trimmed_s = audio.size / sample_rate
+            if trimmed_s < original_s:
+                log.info(
+                    "Silencios recortados: %.1fs -> %.1fs (se factura la duración enviada).",
+                    original_s,
+                    trimmed_s,
+                )
+
         wav_bytes = _to_wav_bytes(audio, sample_rate)
         # El SDK acepta un archivo con nombre; usamos una tupla (nombre, bytes).
         file_tuple = ("audio.wav", wav_bytes, "audio/wav")

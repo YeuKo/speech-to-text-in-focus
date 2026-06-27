@@ -23,7 +23,11 @@ compute_type = "auto"
 # Modelo de la API: "gpt-4o-transcribe", "gpt-4o-mini-transcribe" o "whisper-1".
 model = "gpt-4o-transcribe"
 # Nombre de la variable de entorno donde está la API key (NO se pone la key aquí).
+# Para guardarla de forma segura sin tocar este fichero: "stt --set-api-key".
 api_key_env = "OPENAI_API_KEY"
+# Recortar silencios antes de enviar a la API. La API factura por duración del
+# audio (también el silencio), así que esto abarata el dictado con pausas largas.
+trim_silence = true
 
 [hotkey]
 # Atajos globales separados para cada modo. Sintaxis de la librería "keyboard".

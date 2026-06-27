@@ -49,6 +49,8 @@ class LocalConfig:
 class OpenAIConfig:
     model: str = "gpt-4o-transcribe"
     api_key_env: str = "OPENAI_API_KEY"
+    # Recortar silencios antes de enviar (reduce la duración facturada).
+    trim_silence: bool = True
 
 
 @dataclass
