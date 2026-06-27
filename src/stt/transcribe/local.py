@@ -1,9 +1,4 @@
-"""Backend local con faster-whisper (CTranslate2).
-
-Esbozo de Fase 0: la firma y el ciclo de vida están definidos; la transcripción
-real se completa en el MVP (Fase 1). La carga de ``faster_whisper`` es perezosa
-para no exigir la dependencia al importar el módulo.
-"""
+"""Backend local con faster-whisper (CTranslate2)."""
 
 from __future__ import annotations
 
@@ -27,20 +22,35 @@ class LocalWhisperBackend:
 
     def __init__(self, config: "Config") -> None:
         self._cfg = config
-        self._model = None  # se inicializa en load()
+        self._model = None
         self._hw: hardware.Hardware | None = None
 
     def load(self) -> None:
-        from faster_whisper import WhisperModel  # import perezoso
+        from faster_whisper import WhisperModel
 
         self._hw = hardware.detect(self._cfg.local.device, self._cfg.local.compute_type)
         model_name = hardware.resolve_model(self._cfg.local.model, self._hw)
-        log.info("Cargando modelo local %s...", model_name)
-        self._model = WhisperModel(
-            model_name,
-            device=self._hw.device,
-            compute_type=self._hw.compute_type,
-        )
+        log.info("Cargando modelo local %s en %s...", model_name, self._hw.device)
+        try:
+            self._model = WhisperModel(
+                model_name,
+                device=self._hw.device,
+                compute_type=self._hw.compute_type,
+            )
+        except Exception as exc:
+            if self._hw.device == "cuda":
+                log.warning(
+                    "No se pudo cargar en GPU (%s). "
+                    "Probablemente falta el CUDA Toolkit 12.x (cublas64_12.dll). "
+                    "Reintentando en CPU con modelo 'small'...",
+                    exc,
+                )
+                self._hw = hardware.Hardware(device="cpu", compute_type="int8", has_cuda=False)
+                cpu_model = hardware.resolve_model("small", self._hw)
+                self._model = WhisperModel(cpu_model, device="cpu", compute_type="int8")
+                log.info("Modelo cargado en CPU (%s). Para GPU: instala CUDA Toolkit 12.x.", cpu_model)
+            else:
+                raise
 
     def transcribe(
         self,
