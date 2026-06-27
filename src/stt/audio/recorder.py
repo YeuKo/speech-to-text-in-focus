@@ -15,8 +15,7 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-_SILENCE_RMS = 0.008  # RMS por debajo de esto = silencio (ajustable al micro)
-_WARMUP_S = 0.4       # no cortar durante los primeros 0.4 s (evita falsos positivos)
+_WARMUP_S = 0.4  # no cortar durante los primeros 0.4 s (evita falsos positivos)
 
 
 class Recorder:
@@ -76,7 +75,7 @@ class Recorder:
             return
 
         rms = float(np.sqrt(np.mean(indata ** 2)))
-        if rms >= _SILENCE_RMS:
+        if rms >= self._cfg.silence_threshold:
             self._last_speech_at = now
         elif now - self._last_speech_at > self._cfg.silence_timeout_ms / 1000:
             with self._lock:

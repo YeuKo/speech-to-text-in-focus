@@ -39,6 +39,9 @@ channels = 1
 silence_timeout_ms = 1500
 # Usar VAD (detección de actividad de voz) para recortar silencios.
 use_vad = true
+# Umbral de energía (RMS, 0-1) por debajo del cual se considera silencio.
+# Si te corta mientras hablas, bájalo. Ejecuta "stt --calibrate-mic" para medirlo.
+silence_threshold = 0.006
 
 [injection]
 # Cómo insertar el texto en la ventana con foco: "clipboard" (Ctrl+V) o "type" (teclear).

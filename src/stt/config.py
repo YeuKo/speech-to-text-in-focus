@@ -64,6 +64,9 @@ class AudioConfig:
     channels: int = 1
     silence_timeout_ms: int = 1500
     use_vad: bool = True
+    # Umbral de energía (RMS, 0-1) por debajo del cual se considera silencio.
+    # Más bajo = corta menos (mejor para micros/voz flojos). Usa --calibrate-mic.
+    silence_threshold: float = 0.006
 
 
 @dataclass
@@ -129,6 +132,7 @@ def _check_type(value: Any, annotation: Any, dotted: str) -> None:
     simple = {
         "str": str,
         "int": int,
+        "float": float,
         "bool": bool,
         "list[str]": list,
         "dict[str, str]": dict,
@@ -143,6 +147,9 @@ def _check_type(value: Any, annotation: Any, dotted: str) -> None:
         raise ConfigError(f"{dotted} debe ser un entero, no un booleano.")
     if expected is bool and not isinstance(value, bool):
         raise ConfigError(f"{dotted} debe ser true/false.")
+    # Aceptar enteros donde se espera un float (p. ej. 0 en vez de 0.0).
+    if expected is float and isinstance(value, int) and not isinstance(value, bool):
+        return
     if not isinstance(value, expected):
         raise ConfigError(
             f"{dotted} tiene un tipo inválido: se esperaba {getattr(expected, '__name__', expected)}."
@@ -168,6 +175,8 @@ def _validate(cfg: Config) -> None:
         raise ConfigError("audio.channels debe ser 1 o 2.")
     if cfg.audio.silence_timeout_ms < 0:
         raise ConfigError("audio.silence_timeout_ms no puede ser negativo.")
+    if not 0 < cfg.audio.silence_threshold < 1:
+        raise ConfigError("audio.silence_threshold debe estar entre 0 y 1 (p. ej. 0.006).")
     if not cfg.hotkey.toggle or not cfg.hotkey.push_to_talk:
         raise ConfigError("Los atajos hotkey.toggle y hotkey.push_to_talk no pueden estar vacíos.")
     if cfg.hotkey.toggle == cfg.hotkey.push_to_talk:

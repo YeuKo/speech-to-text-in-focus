@@ -31,6 +31,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Genera audio con la voz de Windows, transcribe y muestra el resultado. No requiere micro.",
     )
+    parser.add_argument(
+        "--calibrate-mic",
+        action="store_true",
+        help="Mide el nivel de tu micrófono y recomienda un valor para audio.silence_threshold.",
+    )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     return parser.parse_args(argv)
 
@@ -121,6 +126,45 @@ def _selftest(cfg: "config.Config") -> int:
 
 
 # ---------------------------------------------------------------------------
+# Calibración de micrófono
+# ---------------------------------------------------------------------------
+
+def _calibrate_mic(cfg: "config.Config", seconds: float = 5.0) -> int:
+    import numpy as np
+    import sounddevice as sd
+
+    sr = cfg.audio.sample_rate
+    block = 1024
+    rms_values: list[float] = []
+
+    log.info("=== CALIBRACIÓN DE MICRÓFONO ===")
+    log.info("Habla con normalidad durante %.0f segundos...", seconds)
+
+    def _cb(indata, frames, t, status):
+        rms_values.append(float(np.sqrt(np.mean(indata ** 2))))
+
+    with sd.InputStream(samplerate=sr, channels=1, dtype="float32",
+                        blocksize=block, callback=_cb):
+        sd.sleep(int(seconds * 1000))
+
+    if not rms_values:
+        log.error("No se capturó audio. ¿Micrófono conectado y con permisos?")
+        return 1
+
+    arr = np.array(rms_values)
+    p10, p50, p90 = (float(np.percentile(arr, p)) for p in (10, 50, 90))
+    # Umbral recomendado: a medio camino entre el silencio (p10) y la voz (p50),
+    # tirando hacia abajo para no cortar en los valles de la voz.
+    recommended = round(max(0.002, p10 + (p50 - p10) * 0.4), 4)
+
+    log.info("Niveles RMS  -> silencio≈%.4f  voz(mediana)≈%.4f  picos≈%.4f", p10, p50, p90)
+    log.info("Umbral actual: %.4f", cfg.audio.silence_threshold)
+    log.info("Recomendado  : %.4f", recommended)
+    log.info("Pon esto en config.toml [audio]:  silence_threshold = %.4f", recommended)
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # Arranque normal (dictado)
 # ---------------------------------------------------------------------------
 
@@ -137,6 +181,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.selftest:
         return _selftest(cfg)
+
+    if args.calibrate_mic:
+        return _calibrate_mic(cfg)
 
     if sys.platform != "win32":
         log.error(
