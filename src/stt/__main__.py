@@ -36,6 +36,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Mide el nivel de tu micrófono y recomienda un valor para audio.silence_threshold.",
     )
+    parser.add_argument(
+        "--set-api-key",
+        action="store_true",
+        help="Guarda tu API key de OpenAI de forma segura en el almacén de Windows (keyring).",
+    )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     return parser.parse_args(argv)
 
@@ -126,6 +131,47 @@ def _selftest(cfg: "config.Config") -> int:
 
 
 # ---------------------------------------------------------------------------
+# Guardar API key en keyring
+# ---------------------------------------------------------------------------
+
+_KEYRING_SERVICE = "stt-dictation"
+_KEYRING_USER = "openai_api_key"
+
+
+def _set_api_key() -> int:
+    import getpass
+
+    try:
+        import keyring
+    except ImportError:
+        log.error("keyring no está instalado. Ejecuta: pip install keyring")
+        return 1
+
+    print("Pega tu API key de OpenAI (no se mostrará al escribir):")
+    try:
+        key = getpass.getpass("API key: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return 1
+
+    if not key:
+        log.error("No se introdujo ninguna key.")
+        return 1
+    if not key.startswith("sk-"):
+        log.warning("La key no empieza por 'sk-'; ¿seguro que es correcta? Se guardará igualmente.")
+
+    try:
+        keyring.set_password(_KEYRING_SERVICE, _KEYRING_USER, key)
+    except Exception as exc:
+        log.error("No se pudo guardar la key en keyring: %s", exc)
+        return 1
+
+    log.info("API key guardada de forma segura en el almacén de Windows.")
+    log.info("Para usarla: pon backend = \"openai\" en config.toml.")
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # Calibración de micrófono
 # ---------------------------------------------------------------------------
 
@@ -178,6 +224,9 @@ def main(argv: list[str] | None = None) -> int:
 
     logging_setup.setup(cfg.logging.level, cfg.logging.dir)
     log.info("STT Dictation %s — backend=%s, idioma=%s", __version__, cfg.engine.backend, cfg.engine.language)
+
+    if args.set_api_key:
+        return _set_api_key()
 
     if args.selftest:
         return _selftest(cfg)

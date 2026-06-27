@@ -64,8 +64,9 @@ class AudioConfig:
     channels: int = 1
     silence_timeout_ms: int = 1500
     use_vad: bool = True
-    # Umbral de energía (RMS, 0-1) por debajo del cual se considera silencio.
-    # Más bajo = corta menos (mejor para micros/voz flojos). Usa --calibrate-mic.
+    # Umbral adaptativo: estima el ruido de fondo y ajusta el corte solo (recomendado).
+    auto_threshold: bool = True
+    # Umbral fijo (RMS, 0-1) usado solo si auto_threshold = false. Ver --calibrate-mic.
     silence_threshold: float = 0.006
 
 
