@@ -46,6 +46,7 @@ class Recorder:
         self._last_speech_at = 0.0
         self._started_at = 0.0
         self._noise_floor: float | None = None
+        self._speech_detected = False
 
     @property
     def is_recording(self) -> bool:
@@ -61,6 +62,7 @@ class Recorder:
             self._started_at = now
             self._last_speech_at = now
             self._noise_floor = None
+            self._speech_detected = False
 
         self._stream = sd.InputStream(
             samplerate=self._cfg.sample_rate,
@@ -110,7 +112,12 @@ class Recorder:
 
         if rms >= threshold:
             self._last_speech_at = now
-        elif now - self._last_speech_at > self._cfg.silence_timeout_ms / 1000:
+            self._speech_detected = True
+        # El auto-stop por silencio solo se activa DESPUÉS de oír voz: así, tras
+        # pulsar el atajo, hay tiempo ilimitado para empezar a hablar.
+        elif self._speech_detected and (
+            now - self._last_speech_at > self._cfg.silence_timeout_ms / 1000
+        ):
             with self._lock:
                 if not self._recording:
                     return
