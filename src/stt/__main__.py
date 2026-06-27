@@ -148,22 +148,34 @@ def main(argv: list[str] | None = None) -> int:
     from stt.controller import Controller
 
     controller = Controller(cfg)
-    stop_event = threading.Event()
 
-    def _sigint(sig, frame):
-        log.info("Cerrando (Ctrl+C)...")
-        stop_event.set()
+    # Intentar arrancar con icono en la bandeja; si pystray falla, caer a un
+    # bucle de espera simple (la app sigue funcionando, solo sin indicador).
+    tray = None
+    try:
+        from stt.ui.tray import TrayIcon
 
-    signal.signal(signal.SIGINT, _sigint)
+        tray = TrayIcon(
+            toggle_hotkey=cfg.hotkey.toggle,
+            ptt_hotkey=cfg.hotkey.push_to_talk,
+            on_quit=controller.stop,
+        )
+        controller.set_on_state_change(tray.set_state)
+    except Exception:
+        log.warning("No se pudo iniciar la bandeja; modo sin indicador.", exc_info=True)
 
     try:
         controller.start()
         log.info(
-            "Listo. Toggle=%s | Push-to-talk=%s | Ctrl+C para salir.",
+            "Listo. Toggle=%s | Push-to-talk=%s.",
             cfg.hotkey.toggle,
             cfg.hotkey.push_to_talk,
         )
-        stop_event.wait()
+        if tray is not None:
+            log.info("Icono en la bandeja activo. Usa 'Salir' en el menú para cerrar.")
+            tray.run()  # bloqueante hasta que se elija "Salir"
+        else:
+            _wait_for_ctrl_c(controller)
     except Exception:
         log.exception("Fallo al iniciar.")
         return 1
@@ -171,6 +183,18 @@ def main(argv: list[str] | None = None) -> int:
         controller.stop()
 
     return 0
+
+
+def _wait_for_ctrl_c(controller) -> None:
+    stop_event = threading.Event()
+
+    def _sigint(sig, frame):
+        log.info("Cerrando (Ctrl+C)...")
+        stop_event.set()
+
+    signal.signal(signal.SIGINT, _sigint)
+    log.info("Pulsa Ctrl+C para salir.")
+    stop_event.wait()
 
 
 if __name__ == "__main__":

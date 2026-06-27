@@ -5,12 +5,13 @@ from __future__ import annotations
 import enum
 import logging
 import threading
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING
 
 import numpy as np
 
-from stt import postprocess
+from stt import postprocess, sounds
 from stt.audio.recorder import Recorder
 from stt.hotkey import HotkeyManager
 from stt.inject import TextInjector
@@ -35,6 +36,7 @@ class Controller:
         self._cfg = config
         self._state = State.IDLE
         self._state_lock = threading.Lock()
+        self._on_state_change: Callable[[str], None] | None = None
         self._backend = create_backend(config)
         self._prompt = postprocess.build_prompt(config.dictionary.terms)
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="stt-tx")
@@ -52,58 +54,67 @@ class Controller:
     def state(self) -> State:
         return self._state
 
+    def set_on_state_change(self, callback: Callable[[str], None]) -> None:
+        """Registra un callback notificado en cada cambio de estado (p. ej. bandeja)."""
+        self._on_state_change = callback
+
     def start(self) -> None:
         log.info("Iniciando controlador (backend=%s)...", self._cfg.engine.backend)
         self._backend.load()
         self._hotkeys.start()
 
+    # --- Transiciones de estado --------------------------------------------
+
+    def _try_transition(self, expected: State, new: State) -> bool:
+        """Compare-and-set atómico. Notifica fuera del lock si cambia."""
+        with self._state_lock:
+            if self._state != expected:
+                return False
+            self._state = new
+        self._notify(new)
+        return True
+
+    def _force_state(self, new: State) -> None:
+        with self._state_lock:
+            self._state = new
+        self._notify(new)
+
+    def _notify(self, state: State) -> None:
+        if self._on_state_change:
+            try:
+                self._on_state_change(state.value)
+            except Exception:
+                log.exception("Error en callback de estado.")
+
     # --- Callbacks de atajos (pueden llamarse desde cualquier hilo) ---------
 
     def on_toggle(self) -> None:
-        with self._state_lock:
-            if self._state == State.IDLE:
-                self._state = State.RECORDING
-                action = "start"
-            elif self._state == State.RECORDING:
-                self._state = State.TRANSCRIBING
-                action = "stop"
-            else:
-                return  # TRANSCRIBING: ignorar
-        if action == "start":
+        if self._try_transition(State.IDLE, State.RECORDING):
             self._begin_recording()
-        else:
+        elif self._try_transition(State.RECORDING, State.TRANSCRIBING):
             self._end_recording()
 
     def on_ptt_press(self) -> None:
-        with self._state_lock:
-            if self._state != State.IDLE:
-                return
-            self._state = State.RECORDING
-        self._begin_recording()
+        if self._try_transition(State.IDLE, State.RECORDING):
+            self._begin_recording()
 
     def on_ptt_release(self) -> None:
-        with self._state_lock:
-            if self._state != State.RECORDING:
-                return
-            self._state = State.TRANSCRIBING
-        self._end_recording()
+        if self._try_transition(State.RECORDING, State.TRANSCRIBING):
+            self._end_recording()
 
     def _on_auto_stop(self) -> None:
-        with self._state_lock:
-            if self._state != State.RECORDING:
-                return
-            self._state = State.TRANSCRIBING
-        self._end_recording()
+        if self._try_transition(State.RECORDING, State.TRANSCRIBING):
+            self._end_recording()
 
     # --- Pipeline -----------------------------------------------------------
 
     def _begin_recording(self) -> None:
-        _beep(880, 80)
+        sounds.recording_start()
         self._recorder.start()
         log.info("Grabando... (pulsa %s para parar o espera el silencio)", self._cfg.hotkey.toggle)
 
     def _end_recording(self) -> None:
-        _beep(440, 80)
+        sounds.recording_stop()
         audio = self._recorder.stop()
         self._executor.submit(self._transcribe_and_inject, audio)
 
@@ -129,22 +140,14 @@ class Controller:
                 log.info("Transcripción vacía.")
         except Exception:
             log.exception("Error durante la transcripción.")
+            sounds.error()
         finally:
-            with self._state_lock:
-                self._state = State.IDLE
+            self._force_state(State.IDLE)
 
     def stop(self) -> None:
         self._hotkeys.stop()
         self._backend.close()
         self._executor.shutdown(wait=False)
-
-
-def _beep(freq: int, duration_ms: int) -> None:
-    try:
-        import winsound
-        threading.Thread(target=winsound.Beep, args=(freq, duration_ms), daemon=True).start()
-    except Exception:
-        pass
 
 
 __all__ = ["Controller", "State"]
