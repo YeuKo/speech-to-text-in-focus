@@ -67,6 +67,19 @@ terms = ["Anthropic", "Kubernetes", "Grafana"]
 "anthropik" = "Anthropic"
 "cubernetes" = "Kubernetes"
 
+[usage]
+# Registrar el coste estimado de cada transcripción por API (solo backend openai).
+track = true
+# Fichero CSV donde se acumula el histórico (timestamp, modelo, segundos, coste).
+file = "logs/usage.csv"
+
+# Tarifa estimada en USD por minuto de audio, por modelo. Ajústalo si OpenAI
+# cambia los precios. El coste mostrado es una estimación, no el importe real.
+[usage.price_per_min]
+"gpt-4o-transcribe" = 0.006
+"gpt-4o-mini-transcribe" = 0.003
+"whisper-1" = 0.006
+
 [logging]
 # Nivel: DEBUG, INFO, WARNING, ERROR.
 level = "INFO"

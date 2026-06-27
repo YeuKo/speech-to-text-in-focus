@@ -85,6 +85,22 @@ class DictionaryConfig:
     replacements: dict[str, str] = field(default_factory=dict)
 
 
+def _default_rates() -> dict[str, float]:
+    # USD por minuto de audio (estimaciones; ajústalas si OpenAI las cambia).
+    return {
+        "gpt-4o-transcribe": 0.006,
+        "gpt-4o-mini-transcribe": 0.003,
+        "whisper-1": 0.006,
+    }
+
+
+@dataclass
+class UsageConfig:
+    track: bool = True
+    file: str = "logs/usage.csv"
+    price_per_min: dict[str, float] = field(default_factory=_default_rates)
+
+
 @dataclass
 class LoggingConfig:
     level: str = "INFO"
@@ -100,6 +116,7 @@ class Config:
     audio: AudioConfig = field(default_factory=AudioConfig)
     injection: InjectionConfig = field(default_factory=InjectionConfig)
     dictionary: DictionaryConfig = field(default_factory=DictionaryConfig)
+    usage: UsageConfig = field(default_factory=UsageConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
 
 
@@ -139,6 +156,7 @@ def _check_type(value: Any, annotation: Any, dotted: str) -> None:
         "bool": bool,
         "list[str]": list,
         "dict[str, str]": dict,
+        "dict[str, float]": dict,
     }
     expected = simple.get(annotation if isinstance(annotation, str) else None)
     if expected is None:
@@ -184,6 +202,9 @@ def _validate(cfg: Config) -> None:
         raise ConfigError("Los atajos hotkey.toggle y hotkey.push_to_talk no pueden estar vacíos.")
     if cfg.hotkey.toggle == cfg.hotkey.push_to_talk:
         raise ConfigError("hotkey.toggle y hotkey.push_to_talk deben ser distintos.")
+    for model, rate in cfg.usage.price_per_min.items():
+        if not isinstance(rate, (int, float)) or isinstance(rate, bool) or rate < 0:
+            raise ConfigError(f"usage.price_per_min['{model}'] debe ser un número >= 0.")
 
 
 def from_dict(data: dict[str, Any]) -> Config:
@@ -202,6 +223,7 @@ def from_dict(data: dict[str, Any]) -> Config:
         "audio": AudioConfig,
         "injection": InjectionConfig,
         "dictionary": DictionaryConfig,
+        "usage": UsageConfig,
         "logging": LoggingConfig,
     }
     kwargs: dict[str, Any] = {}
