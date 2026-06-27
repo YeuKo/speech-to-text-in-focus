@@ -1,11 +1,4 @@
-"""Atajos de teclado globales (toggle y push-to-talk).
-
-Esbozo de Fase 0: define el registro de los dos atajos y los callbacks. La
-implementación con la librería ``keyboard`` (Windows) se completa en el MVP.
-
-- Toggle: una pulsación dispara ``on_toggle`` (alterna grabación).
-- Push-to-talk: ``on_ptt_press`` al pulsar y ``on_ptt_release`` al soltar.
-"""
+"""Atajos de teclado globales: toggle y push-to-talk independientes."""
 
 from __future__ import annotations
 
@@ -32,20 +25,59 @@ class HotkeyManager:
         self._on_toggle = on_toggle
         self._on_ptt_press = on_ptt_press
         self._on_ptt_release = on_ptt_release
-        self._registered = False
+        self._hook = None
+        self._ptt_active = False
+
+        parts = self._cfg.push_to_talk.lower().split("+")
+        self._ptt_trigger = parts[-1]
+        self._ptt_modifiers = parts[:-1]
+
+    def _mods_held(self) -> bool:
+        import keyboard
+        return all(keyboard.is_pressed(m) for m in self._ptt_modifiers)
 
     def start(self) -> None:
-        """Registra los atajos globales."""
-        raise NotImplementedError(
-            "Pendiente Fase 1: registrar con keyboard.add_hotkey (toggle) y "
-            "keyboard.on_press_key/on_release_key (push-to-talk)."
+        import keyboard
+
+        keyboard.add_hotkey(self._cfg.toggle, _safe(self._on_toggle), suppress=False)
+
+        def _hook(event: keyboard.KeyboardEvent) -> None:
+            if event.name != self._ptt_trigger:
+                return
+            if event.event_type == keyboard.KEY_DOWN and self._mods_held():
+                if not self._ptt_active:
+                    self._ptt_active = True
+                    _safe(self._on_ptt_press)()
+            elif event.event_type == keyboard.KEY_UP and self._ptt_active:
+                self._ptt_active = False
+                _safe(self._on_ptt_release)()
+
+        self._hook = keyboard.hook(_hook)
+        log.info(
+            "Atajos registrados — toggle: %s | push-to-talk: %s",
+            self._cfg.toggle,
+            self._cfg.push_to_talk,
         )
 
     def stop(self) -> None:
-        """Libera los atajos registrados."""
-        if not self._registered:
-            return
-        raise NotImplementedError("Pendiente Fase 1: keyboard.remove_all_hotkeys().")
+        import keyboard
+        try:
+            keyboard.remove_all_hotkeys()
+            if self._hook:
+                keyboard.unhook(self._hook)
+        except Exception as exc:
+            log.debug("Error al liberar atajos: %s", exc)
+        self._hook = None
+
+
+def _safe(fn: Callable[[], None]) -> Callable[[], None]:
+    """Evita que un error en el callback tumbe el listener de teclado."""
+    def wrapper() -> None:
+        try:
+            fn()
+        except Exception:
+            log.exception("Error en callback de atajo.")
+    return wrapper
 
 
 __all__ = ["HotkeyManager"]

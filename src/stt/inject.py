@@ -1,13 +1,9 @@
-"""Inyección de texto en la ventana con foco.
-
-Esbozo de Fase 0: define la interfaz. La implementación (Windows) se completa en
-el MVP. Por defecto se usa el portapapeles + Ctrl+V (rápido y soporta Unicode/
-acentos), restaurando el contenido previo del portapapeles. Alternativa: teclear.
-"""
+"""Inyección de texto en la ventana con foco (portapapeles + Ctrl+V)."""
 
 from __future__ import annotations
 
 import logging
+import time
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -21,7 +17,6 @@ class TextInjector:
         self._cfg = config
 
     def inject(self, text: str) -> None:
-        """Inserta ``text`` donde esté el foco del cursor."""
         if not text:
             return
         if self._cfg.method == "clipboard":
@@ -30,13 +25,33 @@ class TextInjector:
             self._inject_typing(text)
 
     def _inject_clipboard(self, text: str) -> None:
-        raise NotImplementedError(
-            "Pendiente Fase 1: guardar portapapeles, pyperclip.copy(text), "
-            "keyboard.send('ctrl+v'), y restaurar si restore_clipboard."
-        )
+        import keyboard
+        import pyperclip
+
+        previous: str | None = None
+        if self._cfg.restore_clipboard:
+            try:
+                previous = pyperclip.paste()
+            except Exception as exc:
+                log.debug("No se pudo leer el portapapeles previo: %s", exc)
+
+        try:
+            pyperclip.copy(text)
+            time.sleep(self._cfg.paste_delay_ms / 1000)
+            keyboard.send("ctrl+v")
+            log.info("Pegado: %d caracteres.", len(text))
+        finally:
+            if previous is not None:
+                time.sleep(0.15)  # esperar a que el Ctrl+V aterrice antes de restaurar
+                try:
+                    pyperclip.copy(previous)
+                except Exception as exc:
+                    log.debug("No se pudo restaurar el portapapeles: %s", exc)
 
     def _inject_typing(self, text: str) -> None:
-        raise NotImplementedError("Pendiente Fase 1: keyboard.write(text).")
+        import keyboard
+        keyboard.write(text, delay=0.008)
+        log.info("Tecleado: %d caracteres.", len(text))
 
 
 __all__ = ["TextInjector"]
