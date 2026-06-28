@@ -27,20 +27,14 @@ log = logging.getLogger(__name__)
 
 def _resolve_api_key(env_name: str) -> str:
     """Obtiene la API key de la variable de entorno o de keyring."""
-    key = os.environ.get(env_name)
+    from stt import keystore
+
+    key = os.environ.get(env_name) or keystore.get_api_key()
     if key:
         return key
-    try:
-        import keyring  # type: ignore
-
-        stored = keyring.get_password("stt-dictation", "openai_api_key")
-        if stored:
-            return stored
-    except Exception as exc:
-        log.debug("keyring no disponible: %s", exc)
     raise RuntimeError(
-        f"No se encontró la API key de OpenAI. Define la variable de entorno {env_name} "
-        "o guárdala en keyring (servicio 'stt-dictation', usuario 'openai_api_key')."
+        f"No se encontró la API key de OpenAI. Define la variable de entorno {env_name}, "
+        "usa 'stt --set-api-key' o el menú 'Set OpenAI API key…' de la bandeja."
     )
 
 

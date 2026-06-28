@@ -104,14 +104,16 @@ permanently, edit <code>use_vad</code> under <code>[audio]</code> in
 so they are recognised correctly (e.g. brand names, people, technical terms).</p>
 
 <h2>Local vs OpenAI</h2>
-<p>In <code>config.toml</code>, set <code>backend</code> under <code>[engine]</code>:</p>
+<p>Switch anytime from the tray menu → <b>Engine</b> (or set <code>backend</code>
+under <code>[engine]</code> in <code>config.toml</code>):</p>
 <ul>
-  <li><b>local</b> — runs on your computer. Free and private. Faster with an
+  <li><b>Local</b> — runs on your computer. Free and private. Faster with an
       NVIDIA GPU (CUDA 12.x).</li>
-  <li><b>openai</b> — uses the OpenAI API. Needs your own API key
-      (run <code>stt --set-api-key</code>). Billed by audio length; silences are
-      trimmed automatically to reduce cost, and each transcription's estimated
-      cost is logged to <code>logs/usage.csv</code>.</li>
+  <li><b>OpenAI API</b> — uses the OpenAI API. Needs your own API key: set it from
+      the tray menu → <b>Set OpenAI API key…</b> (or <code>stt --set-api-key</code>).
+      Billed by audio length; silences are trimmed automatically to reduce cost,
+      and each transcription's estimated cost is logged and shown under
+      tray → <b>Usage / cost</b>.</li>
 </ul>
 
 <h2>Troubleshooting</h2>

@@ -134,18 +134,10 @@ def _selftest(cfg: "config.Config") -> int:
 # Guardar API key en keyring
 # ---------------------------------------------------------------------------
 
-_KEYRING_SERVICE = "stt-dictation"
-_KEYRING_USER = "openai_api_key"
-
-
 def _set_api_key() -> int:
     import getpass
 
-    try:
-        import keyring
-    except ImportError:
-        log.error("keyring no está instalado. Ejecuta: pip install keyring")
-        return 1
+    from stt import keystore
 
     print("Pega tu API key de OpenAI (no se mostrará al escribir):")
     try:
@@ -160,14 +152,10 @@ def _set_api_key() -> int:
     if not key.startswith("sk-"):
         log.warning("La key no empieza por 'sk-'; ¿seguro que es correcta? Se guardará igualmente.")
 
-    try:
-        keyring.set_password(_KEYRING_SERVICE, _KEYRING_USER, key)
-    except Exception as exc:
-        log.error("No se pudo guardar la key en keyring: %s", exc)
+    if not keystore.set_api_key(key):
         return 1
-
     log.info("API key guardada de forma segura en el almacén de Windows.")
-    log.info("Para usarla: pon backend = \"openai\" en config.toml.")
+    log.info("Para usarla: cambia el engine a OpenAI (config o menú de la bandeja).")
     return 0
 
 
@@ -252,8 +240,31 @@ def main(argv: list[str] | None = None) -> int:
     # bucle de espera simple (la app sigue funcionando, solo sin indicador).
     tray = None
     try:
+        from stt import keystore
+        from stt.ui.dialogs import ask_api_key, message_box
         from stt.ui.help import open_config, open_instructions, open_usage_report
         from stt.ui.tray import TrayIcon
+
+        def _set_engine(name: str) -> None:
+            if name == "openai" and not keystore.has_api_key():
+                message_box(
+                    "OpenAI API key required",
+                    "To use the OpenAI engine you need an API key.\n\n"
+                    "Use the tray menu → 'Set OpenAI API key…' first.",
+                )
+                return
+            ok, msg = controller.switch_backend(name)
+            if not ok:
+                message_box("Could not switch engine", msg, error=True)
+
+        def _set_api_key_dialog() -> None:
+            key = ask_api_key()
+            if not key:
+                return
+            if keystore.set_api_key(key):
+                message_box("API key saved", "Your OpenAI API key was saved securely.")
+            else:
+                message_box("Error", "Could not save the API key.", error=True)
 
         tray = TrayIcon(
             toggle_hotkey=cfg.hotkey.toggle,
@@ -264,6 +275,9 @@ def main(argv: list[str] | None = None) -> int:
             is_auto_stop=controller.is_auto_stop,
             on_open_config=lambda: open_config(config_path),
             on_open_usage=lambda: open_usage_report(cfg),
+            on_set_engine=_set_engine,
+            current_engine=controller.current_backend,
+            on_set_api_key=_set_api_key_dialog,
         )
         controller.set_on_state_change(tray.set_state)
     except Exception:
@@ -277,8 +291,15 @@ def main(argv: list[str] | None = None) -> int:
             cfg.hotkey.push_to_talk,
         )
         if tray is not None:
-            log.info("Icono en la bandeja activo. Usa 'Salir' en el menú para cerrar.")
-            tray.run()  # bloqueante hasta que se elija "Salir"
+            log.info("Icono en la bandeja activo. Usa 'Quit' en el menú para cerrar.")
+            if controller.startup_warning:
+                try:
+                    from stt.ui.dialogs import message_box
+
+                    message_box("STT Dictation", controller.startup_warning)
+                except Exception:
+                    pass
+            tray.run()  # bloqueante hasta que se elija "Quit"
         else:
             _wait_for_ctrl_c(controller)
     except Exception:

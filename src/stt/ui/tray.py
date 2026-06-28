@@ -52,6 +52,9 @@ class TrayIcon:
         is_auto_stop: Callable[[], bool],
         on_open_config: Callable[[], None],
         on_open_usage: Callable[[], None],
+        on_set_engine: Callable[[str], None],
+        current_engine: Callable[[], str],
+        on_set_api_key: Callable[[], None],
     ) -> None:
         self._toggle = toggle_hotkey
         self._ptt = ptt_hotkey
@@ -61,11 +64,29 @@ class TrayIcon:
         self._is_auto_stop = is_auto_stop
         self._on_open_config = on_open_config
         self._on_open_usage = on_open_usage
+        self._on_set_engine = on_set_engine
+        self._current_engine = current_engine
+        self._on_set_api_key = on_set_api_key
         self._icon = None
         self._images = {state: _make_image(rgb) for state, rgb in _COLORS.items()}
 
     def _build(self):
         import pystray
+
+        engine_menu = pystray.Menu(
+            pystray.MenuItem(
+                "Local (free, on-device)",
+                lambda icon, item: self._handle_set_engine("local"),
+                checked=lambda item: self._current_engine() == "local",
+                radio=True,
+            ),
+            pystray.MenuItem(
+                "OpenAI API (needs key)",
+                lambda icon, item: self._handle_set_engine("openai"),
+                checked=lambda item: self._current_engine() == "openai",
+                radio=True,
+            ),
+        )
 
         menu = pystray.Menu(
             pystray.MenuItem(f"Toggle dictation: {self._toggle}", None, enabled=False),
@@ -76,6 +97,8 @@ class TrayIcon:
                 self._handle_toggle_auto,
                 checked=lambda item: self._is_auto_stop(),
             ),
+            pystray.MenuItem("Engine", engine_menu),
+            pystray.MenuItem("Set OpenAI API key…", self._handle_set_key),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Open config file", self._handle_open_config),
             pystray.MenuItem("Usage / cost", self._handle_open_usage),
@@ -116,6 +139,20 @@ class TrayIcon:
             self._on_open_usage()
         except Exception:
             log.exception("Error al abrir el informe de uso.")
+
+    def _handle_set_engine(self, name: str) -> None:
+        try:
+            self._on_set_engine(name)
+        except Exception:
+            log.exception("Error al cambiar de engine.")
+        if self._icon is not None:
+            self._icon.update_menu()
+
+    def _handle_set_key(self, *args) -> None:
+        try:
+            self._on_set_api_key()
+        except Exception:
+            log.exception("Error al guardar la API key.")
 
     def _handle_quit(self, *args) -> None:
         try:

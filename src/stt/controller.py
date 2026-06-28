@@ -38,6 +38,8 @@ class Controller:
         self._state_lock = threading.Lock()
         self._on_state_change: Callable[[str], None] | None = None
         self._backend = create_backend(config)
+        self._backend_lock = threading.Lock()
+        self.startup_warning: str | None = None
         self._prompt = postprocess.build_prompt(config.dictionary.terms)
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="stt-tx")
 
@@ -72,8 +74,57 @@ class Controller:
 
     def start(self) -> None:
         log.info("Iniciando controlador (backend=%s)...", self._cfg.engine.backend)
-        self._backend.load()
+        try:
+            self._backend.load()
+        except Exception as exc:
+            # Arranque elegante: si OpenAI falla (p. ej. sin API key), caer a local
+            # en vez de reventar, y avisar al usuario.
+            if self._cfg.engine.backend == "openai":
+                log.warning("No se pudo iniciar OpenAI (%s). Usando local.", exc)
+                self.startup_warning = (
+                    "OpenAI is not available (missing/invalid API key). "
+                    "Falling back to the local engine. You can set a key and switch "
+                    "engine from the tray menu."
+                )
+                self._cfg.engine.backend = "local"
+                self._backend = create_backend(self._cfg)
+                self._backend.load()
+            else:
+                raise
         self._hotkeys.start()
+
+    def current_backend(self) -> str:
+        return self._cfg.engine.backend
+
+    def switch_backend(self, name: str) -> tuple[bool, str]:
+        """Cambia el engine en caliente. Devuelve (ok, mensaje).
+
+        Si el nuevo backend no puede cargar (p. ej. OpenAI sin key), revierte al
+        anterior y deja el sistema funcionando.
+        """
+        if name == self._cfg.engine.backend:
+            return True, f"Already using {name}."
+        if self._state != State.IDLE:
+            return False, "Busy transcribing — try again in a moment."
+
+        previous = self._cfg.engine.backend
+        self._cfg.engine.backend = name
+        try:
+            new_backend = create_backend(self._cfg)
+            new_backend.load()
+        except Exception as exc:
+            self._cfg.engine.backend = previous  # revertir
+            log.warning("No se pudo cambiar a %s: %s", name, exc)
+            return False, str(exc)
+
+        with self._backend_lock:
+            old, self._backend = self._backend, new_backend
+        try:
+            old.close()
+        except Exception:
+            pass
+        log.info("Engine cambiado a %s.", name)
+        return True, f"Now using {name}."
 
     # --- Transiciones de estado --------------------------------------------
 
@@ -138,7 +189,9 @@ class Controller:
                 return
 
             lang = self._cfg.engine.language if self._cfg.engine.language != "auto" else None
-            result = self._backend.transcribe(
+            with self._backend_lock:
+                backend = self._backend
+            result = backend.transcribe(
                 audio,
                 sample_rate=self._cfg.audio.sample_rate,
                 language=lang,
