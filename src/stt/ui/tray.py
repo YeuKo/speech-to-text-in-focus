@@ -1,11 +1,12 @@
-"""Icono en la bandeja del sistema con indicador de estado por color.
+"""Icono en la bandeja del sistema con indicador de estado por color y menú.
 
-- gris/azul  -> en espera (idle)
-- rojo       -> grabando
-- naranja    -> transcribiendo
+- azul    -> en espera (idle)
+- rojo    -> grabando
+- naranja -> transcribiendo
 
 ``run()`` es bloqueante (arranca el bucle de eventos de la bandeja) y debe
 llamarse en el hilo principal. ``set_state()`` se puede llamar desde otros hilos.
+Las etiquetas están en inglés para uso por terceros.
 """
 
 from __future__ import annotations
@@ -17,15 +18,15 @@ log = logging.getLogger(__name__)
 
 # RGB por estado (clave = State.value)
 _COLORS: dict[str, tuple[int, int, int]] = {
-    "idle": (90, 120, 160),        # azul grisáceo
-    "recording": (220, 60, 60),    # rojo
+    "idle": (90, 120, 160),          # azul grisáceo
+    "recording": (220, 60, 60),      # rojo
     "transcribing": (235, 165, 40),  # naranja
 }
 
 _LABELS: dict[str, str] = {
-    "idle": "En espera",
-    "recording": "Grabando…",
-    "transcribing": "Transcribiendo…",
+    "idle": "Idle",
+    "recording": "Recording…",
+    "transcribing": "Transcribing…",
 }
 
 
@@ -46,10 +47,16 @@ class TrayIcon:
         toggle_hotkey: str,
         ptt_hotkey: str,
         on_quit: Callable[[], None],
+        on_help: Callable[[], None],
+        on_toggle_auto_stop: Callable[[], None],
+        is_auto_stop: Callable[[], bool],
     ) -> None:
         self._toggle = toggle_hotkey
         self._ptt = ptt_hotkey
         self._on_quit = on_quit
+        self._on_help = on_help
+        self._on_toggle_auto_stop = on_toggle_auto_stop
+        self._is_auto_stop = is_auto_stop
         self._icon = None
         self._images = {state: _make_image(rgb) for state, rgb in _COLORS.items()}
 
@@ -57,19 +64,41 @@ class TrayIcon:
         import pystray
 
         menu = pystray.Menu(
-            pystray.MenuItem(f"Toggle: {self._toggle}", None, enabled=False),
+            pystray.MenuItem(f"Toggle dictation: {self._toggle}", None, enabled=False),
             pystray.MenuItem(f"Push-to-talk: {self._ptt}", None, enabled=False),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Salir", self._handle_quit),
+            pystray.MenuItem(
+                "Auto-stop on silence",
+                self._handle_toggle_auto,
+                checked=lambda item: self._is_auto_stop(),
+            ),
+            pystray.MenuItem("Help / Instructions", self._handle_help),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem("Quit", self._handle_quit),
         )
         self._icon = pystray.Icon(
             "stt",
             icon=self._images["idle"],
-            title="STT — En espera",
+            title="STT — Idle",
             menu=menu,
         )
 
-    def _handle_quit(self) -> None:
+    # Los handlers aceptan (icon, item) que pasa pystray; los ignoramos.
+    def _handle_toggle_auto(self, *args) -> None:
+        try:
+            self._on_toggle_auto_stop()
+        except Exception:
+            log.exception("Error al cambiar el modo de auto-stop.")
+        if self._icon is not None:
+            self._icon.update_menu()
+
+    def _handle_help(self, *args) -> None:
+        try:
+            self._on_help()
+        except Exception:
+            log.exception("Error al abrir la ayuda.")
+
+    def _handle_quit(self, *args) -> None:
         try:
             self._on_quit()
         finally:
@@ -82,8 +111,7 @@ class TrayIcon:
         img = self._images.get(state)
         if img is not None:
             self._icon.icon = img
-        label = _LABELS.get(state, state)
-        self._icon.title = f"STT — {label}"
+        self._icon.title = f"STT — {_LABELS.get(state, state)}"
 
     def run(self) -> None:
         """Bloqueante: arranca el bucle de la bandeja (hilo principal)."""

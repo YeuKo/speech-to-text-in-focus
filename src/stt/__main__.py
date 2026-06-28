@@ -249,12 +249,16 @@ def main(argv: list[str] | None = None) -> int:
     # bucle de espera simple (la app sigue funcionando, solo sin indicador).
     tray = None
     try:
+        from stt.ui.help import open_instructions
         from stt.ui.tray import TrayIcon
 
         tray = TrayIcon(
             toggle_hotkey=cfg.hotkey.toggle,
             ptt_hotkey=cfg.hotkey.push_to_talk,
             on_quit=controller.stop,
+            on_help=lambda: open_instructions(cfg),
+            on_toggle_auto_stop=lambda: controller.set_auto_stop(not controller.is_auto_stop()),
+            is_auto_stop=controller.is_auto_stop,
         )
         controller.set_on_state_change(tray.set_state)
     except Exception:

@@ -58,6 +58,18 @@ class Controller:
         """Registra un callback notificado en cada cambio de estado (p. ej. bandeja)."""
         self._on_state_change = callback
 
+    def set_auto_stop(self, enabled: bool) -> None:
+        """Activa/desactiva el auto-stop por silencio en caliente (sin reiniciar).
+
+        Con False, la grabación solo para cuando se vuelve a pulsar el atajo
+        (modo manual): permite pausas tan largas como se quiera.
+        """
+        self._cfg.audio.use_vad = enabled
+        log.info("Auto-stop por silencio: %s", "ON" if enabled else "OFF (manual)")
+
+    def is_auto_stop(self) -> bool:
+        return self._cfg.audio.use_vad
+
     def start(self) -> None:
         log.info("Iniciando controlador (backend=%s)...", self._cfg.engine.backend)
         self._backend.load()
