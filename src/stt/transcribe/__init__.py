@@ -1,4 +1,4 @@
-"""Backends de transcripción (local con faster-whisper o API de OpenAI)."""
+"""Transcription backends (local faster-whisper or OpenAI API)."""
 
 from stt.transcribe.base import TranscriberBackend, TranscriptionResult, create_backend
 

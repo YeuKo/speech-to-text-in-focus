@@ -8,11 +8,11 @@ class TestBuildPrompt:
 
     def test_joins_terms(self):
         assert postprocess.build_prompt(["Anthropic", "Kubernetes"]) == (
-            "Vocabulario: Anthropic, Kubernetes."
+            "Vocabulary: Anthropic, Kubernetes."
         )
 
     def test_strips_whitespace(self):
-        assert postprocess.build_prompt(["  Grafana  "]) == "Vocabulario: Grafana."
+        assert postprocess.build_prompt(["  Grafana  "]) == "Vocabulary: Grafana."
 
 
 class TestApply:
@@ -55,5 +55,6 @@ class TestApplyFuzzy:
         assert postprocess.apply_fuzzy("hola", []) == "hola"
 
     def test_exact_term_untouched(self):
-        # Si rapidfuzz no está, devuelve el texto igual; si está, no debe romper la palabra exacta.
+        # If rapidfuzz is missing, the text is returned as-is; if present, it must
+        # not break a word that already matches a term exactly.
         assert postprocess.apply_fuzzy("Anthropic", ["Anthropic"]) == "Anthropic"

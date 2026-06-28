@@ -1,3 +1,3 @@
-"""STT Dictation: dictado por voz para Windows con Whisper local o API de OpenAI."""
+"""STT Dictation: voice dictation for Windows with local Whisper or the OpenAI API."""
 
 __version__ = "0.1.0"

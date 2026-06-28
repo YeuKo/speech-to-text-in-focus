@@ -20,21 +20,21 @@ class TestTrimSilence:
         assert out.size == 0
 
     def test_pure_silence_returns_original(self):
-        # Sin voz detectable, no debe arriesgar a perder el audio.
+        # With no detectable speech, it must not risk losing the audio.
         audio = _silence(2.0)
         out = trim_silence(audio, SR)
         assert out.size == audio.size
 
     def test_removes_long_silence(self):
-        # 1s voz + 5s silencio + 1s voz -> debe quedar bastante más corto.
+        # 1s speech + 5s silence + 1s speech -> should be considerably shorter.
         audio = np.concatenate([_tone(1.0), _silence(5.0), _tone(1.0)])
         out = trim_silence(audio, SR)
         assert out.size < audio.size
-        # Conserva al menos la voz (2s) y no más que el original.
+        # Keeps at least the speech (2s) and no more than the original.
         assert out.size >= int(SR * 1.5)
 
     def test_keeps_speech_with_padding(self):
-        # Audio solo voz: apenas debe recortar (algo de borde por el framing).
+        # Speech-only audio: should barely trim (some edge loss from framing).
         audio = _tone(2.0)
         out = trim_silence(audio, SR)
         assert out.size >= int(SR * 1.8)
@@ -42,4 +42,4 @@ class TestTrimSilence:
     def test_trailing_silence_trimmed(self):
         audio = np.concatenate([_tone(1.0), _silence(4.0)])
         out = trim_silence(audio, SR)
-        assert out.size < int(SR * 2.0)  # se quitó la mayor parte del silencio final
+        assert out.size < int(SR * 2.0)  # most of the trailing silence was removed

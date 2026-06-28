@@ -1,4 +1,4 @@
-"""Atajos de teclado globales: toggle y push-to-talk independientes."""
+"""Global keyboard shortcuts: independent toggle and push-to-talk."""
 
 from __future__ import annotations
 
@@ -54,7 +54,7 @@ class HotkeyManager:
 
         self._hook = keyboard.hook(_hook)
         log.info(
-            "Atajos registrados — toggle: %s | push-to-talk: %s",
+            "Hotkeys registered — toggle: %s | push-to-talk: %s",
             self._cfg.toggle,
             self._cfg.push_to_talk,
         )
@@ -66,17 +66,17 @@ class HotkeyManager:
             if self._hook:
                 keyboard.unhook(self._hook)
         except Exception as exc:
-            log.debug("Error al liberar atajos: %s", exc)
+            log.debug("Error releasing hotkeys: %s", exc)
         self._hook = None
 
 
 def _safe(fn: Callable[[], None]) -> Callable[[], None]:
-    """Evita que un error en el callback tumbe el listener de teclado."""
+    """Prevent an error in the callback from killing the keyboard listener."""
     def wrapper() -> None:
         try:
             fn()
         except Exception:
-            log.exception("Error en callback de atajo.")
+            log.exception("Error in hotkey callback.")
     return wrapper
 
 

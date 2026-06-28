@@ -1,4 +1,4 @@
-"""Controlador central: máquina de estados que orquesta todos los componentes."""
+"""Central controller: state machine that orchestrates all components."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-_MIN_AUDIO_S = 0.3  # descartar grabaciones más cortas (pulsaciones accidentales)
+_MIN_AUDIO_S = 0.3  # discard recordings shorter than this (accidental key presses)
 
 
 class State(enum.Enum):
@@ -57,30 +57,30 @@ class Controller:
         return self._state
 
     def set_on_state_change(self, callback: Callable[[str], None]) -> None:
-        """Registra un callback notificado en cada cambio de estado (p. ej. bandeja)."""
+        """Register a callback fired on every state change (e.g. the tray icon)."""
         self._on_state_change = callback
 
     def set_auto_stop(self, enabled: bool) -> None:
-        """Activa/desactiva el auto-stop por silencio en caliente (sin reiniciar).
+        """Enable/disable silence auto-stop on the fly (no restart needed).
 
-        Con False, la grabación solo para cuando se vuelve a pulsar el atajo
-        (modo manual): permite pausas tan largas como se quiera.
+        With False, recording only stops when the shortcut is pressed again
+        (manual mode): it allows arbitrarily long pauses.
         """
         self._cfg.audio.use_vad = enabled
-        log.info("Auto-stop por silencio: %s", "ON" if enabled else "OFF (manual)")
+        log.info("Silence auto-stop: %s", "ON" if enabled else "OFF (manual)")
 
     def is_auto_stop(self) -> bool:
         return self._cfg.audio.use_vad
 
     def start(self) -> None:
-        log.info("Iniciando controlador (backend=%s)...", self._cfg.engine.backend)
+        log.info("Starting controller (backend=%s)...", self._cfg.engine.backend)
         try:
             self._backend.load()
         except Exception as exc:
-            # Arranque elegante: si OpenAI falla (p. ej. sin API key), caer a local
-            # en vez de reventar, y avisar al usuario.
+            # Graceful start: if OpenAI fails (e.g. no API key), fall back to
+            # local instead of crashing, and tell the user.
             if self._cfg.engine.backend == "openai":
-                log.warning("No se pudo iniciar OpenAI (%s). Usando local.", exc)
+                log.warning("Could not start OpenAI (%s). Using local instead.", exc)
                 self.startup_warning = (
                     "OpenAI is not available (missing/invalid API key). "
                     "Falling back to the local engine. You can set a key and switch "
@@ -97,10 +97,10 @@ class Controller:
         return self._cfg.engine.backend
 
     def switch_backend(self, name: str) -> tuple[bool, str]:
-        """Cambia el engine en caliente. Devuelve (ok, mensaje).
+        """Switch the engine on the fly. Returns (ok, message).
 
-        Si el nuevo backend no puede cargar (p. ej. OpenAI sin key), revierte al
-        anterior y deja el sistema funcionando.
+        If the new backend cannot load (e.g. OpenAI with no key), it reverts to
+        the previous one and keeps the system running.
         """
         if name == self._cfg.engine.backend:
             return True, f"Already using {name}."
@@ -113,8 +113,8 @@ class Controller:
             new_backend = create_backend(self._cfg)
             new_backend.load()
         except Exception as exc:
-            self._cfg.engine.backend = previous  # revertir
-            log.warning("No se pudo cambiar a %s: %s", name, exc)
+            self._cfg.engine.backend = previous  # revert
+            log.warning("Could not switch to %s: %s", name, exc)
             return False, str(exc)
 
         with self._backend_lock:
@@ -123,13 +123,13 @@ class Controller:
             old.close()
         except Exception:
             pass
-        log.info("Engine cambiado a %s.", name)
+        log.info("Engine switched to %s.", name)
         return True, f"Now using {name}."
 
-    # --- Transiciones de estado --------------------------------------------
+    # --- State transitions --------------------------------------------------
 
     def _try_transition(self, expected: State, new: State) -> bool:
-        """Compare-and-set atómico. Notifica fuera del lock si cambia."""
+        """Atomic compare-and-set. Notifies outside the lock if it changes."""
         with self._state_lock:
             if self._state != expected:
                 return False
@@ -147,9 +147,9 @@ class Controller:
             try:
                 self._on_state_change(state.value)
             except Exception:
-                log.exception("Error en callback de estado.")
+                log.exception("Error in state-change callback.")
 
-    # --- Callbacks de atajos (pueden llamarse desde cualquier hilo) ---------
+    # --- Hotkey callbacks (may be called from any thread) -------------------
 
     def on_toggle(self) -> None:
         if self._try_transition(State.IDLE, State.RECORDING):
@@ -174,7 +174,7 @@ class Controller:
     def _begin_recording(self) -> None:
         sounds.recording_start()
         self._recorder.start()
-        log.info("Grabando... (pulsa %s para parar o espera el silencio)", self._cfg.hotkey.toggle)
+        log.info("Recording... (press %s to stop or wait for silence)", self._cfg.hotkey.toggle)
 
     def _end_recording(self) -> None:
         sounds.recording_stop()
@@ -185,7 +185,7 @@ class Controller:
         try:
             min_samples = int(self._cfg.audio.sample_rate * _MIN_AUDIO_S)
             if len(audio) < min_samples:
-                log.info("Audio demasiado corto, ignorando.")
+                log.info("Audio too short, ignoring.")
                 return
 
             lang = self._cfg.engine.language if self._cfg.engine.language != "auto" else None
@@ -199,12 +199,15 @@ class Controller:
             )
             text = postprocess.apply(result.text, self._cfg.dictionary.replacements)
             if text:
-                log.info("Transcrito en %.1fs: %r", result.elapsed_s or 0, text)
+                # Log only the length at INFO; the full text (potentially private)
+                # is logged at DEBUG only.
+                log.info("Transcribed %d chars in %.1fs.", len(text), result.elapsed_s or 0)
+                log.debug("Transcription text: %r", text)
                 self._injector.inject(text)
             else:
-                log.info("Transcripción vacía.")
+                log.info("Empty transcription.")
         except Exception:
-            log.exception("Error durante la transcripción.")
+            log.exception("Error during transcription.")
             sounds.error()
         finally:
             self._force_state(State.IDLE)

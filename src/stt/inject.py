@@ -1,4 +1,4 @@
-"""Inyección de texto en la ventana con foco (portapapeles + Ctrl+V)."""
+"""Text injection into the focused window (clipboard + Ctrl+V)."""
 
 from __future__ import annotations
 
@@ -33,25 +33,25 @@ class TextInjector:
             try:
                 previous = pyperclip.paste()
             except Exception as exc:
-                log.debug("No se pudo leer el portapapeles previo: %s", exc)
+                log.debug("Could not read the previous clipboard: %s", exc)
 
         try:
             pyperclip.copy(text)
             time.sleep(self._cfg.paste_delay_ms / 1000)
             keyboard.send("ctrl+v")
-            log.info("Pegado: %d caracteres.", len(text))
+            log.info("Pasted %d characters.", len(text))
         finally:
             if previous is not None:
-                time.sleep(0.15)  # esperar a que el Ctrl+V aterrice antes de restaurar
+                time.sleep(0.15)  # let the Ctrl+V land before restoring
                 try:
                     pyperclip.copy(previous)
                 except Exception as exc:
-                    log.debug("No se pudo restaurar el portapapeles: %s", exc)
+                    log.debug("Could not restore the clipboard: %s", exc)
 
     def _inject_typing(self, text: str) -> None:
         import keyboard
         keyboard.write(text, delay=0.008)
-        log.info("Tecleado: %d caracteres.", len(text))
+        log.info("Typed %d characters.", len(text))
 
 
 __all__ = ["TextInjector"]

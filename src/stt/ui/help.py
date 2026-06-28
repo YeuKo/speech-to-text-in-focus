@@ -1,7 +1,8 @@
-"""Genera y abre una página de instrucciones (en inglés) en el navegador.
+"""Generate and open help pages (in English) in the browser.
 
-El HTML se construye con los atajos y ajustes reales del usuario, así siempre
-refleja su configuración. Pensado para que otra persona entienda la app rápido.
+The HTML is built with the user's real shortcuts and settings, so it always
+reflects their configuration. Designed so another person can understand the app
+quickly.
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ log = logging.getLogger(__name__)
 
 
 def _open(path: str | Path) -> None:
-    """Abre un archivo con la aplicación por defecto del sistema."""
+    """Open a file with the system's default application."""
     if hasattr(os, "startfile"):
         os.startfile(str(path))  # Windows
     else:
@@ -133,30 +134,30 @@ tray icon → Quit.</p>
 
 
 def open_instructions(cfg: "Config") -> None:
-    """Escribe las instrucciones a un HTML temporal y lo abre en el navegador."""
+    """Write the instructions to a temp HTML file and open it in the browser."""
     try:
         path = _write_temp("stt_instructions.html", _build_html(cfg))
         _open(path)
-        log.info("Instrucciones abiertas: %s", path)
+        log.info("Instructions opened: %s", path)
     except Exception:
-        log.exception("No se pudieron abrir las instrucciones.")
+        log.exception("Could not open the instructions.")
 
 
 def open_config(config_path: str | Path, example_path: str | Path = "config.example.toml") -> None:
-    """Abre el config.toml. Si no existe, lo crea desde el ejemplo si está disponible."""
+    """Open config.toml. If it doesn't exist, create it from the example if available."""
     try:
         p = Path(config_path)
         if not p.exists():
             ex = Path(example_path)
             if ex.exists():
                 shutil.copy(ex, p)
-                log.info("Creado %s desde el ejemplo.", p)
+                log.info("Created %s from the example.", p)
         if p.exists():
             _open(p)
         else:
-            log.warning("No hay fichero de configuración para abrir: %s", p)
+            log.warning("No configuration file to open: %s", p)
     except Exception:
-        log.exception("No se pudo abrir la configuración.")
+        log.exception("Could not open the configuration.")
 
 
 def _build_usage_html(cfg: "Config") -> str:
@@ -167,7 +168,7 @@ def _build_usage_html(cfg: "Config") -> str:
             with path.open(newline="", encoding="utf-8") as fh:
                 rows = list(csv.DictReader(fh))
         except OSError as exc:
-            log.debug("No se pudo leer el uso: %s", exc)
+            log.debug("Could not read the usage file: %s", exc)
 
     style = (
         "body{font-family:Segoe UI,system-ui,sans-serif;max-width:760px;margin:40px auto;"
@@ -220,13 +221,13 @@ def _build_usage_html(cfg: "Config") -> str:
 
 
 def open_usage_report(cfg: "Config") -> None:
-    """Genera y abre un informe de uso/coste (siempre funciona, aun sin datos)."""
+    """Generate and open a usage/cost report (always works, even with no data)."""
     try:
         path = _write_temp("stt_usage.html", _build_usage_html(cfg))
         _open(path)
-        log.info("Informe de uso abierto: %s", path)
+        log.info("Usage report opened: %s", path)
     except Exception:
-        log.exception("No se pudo abrir el informe de uso.")
+        log.exception("Could not open the usage report.")
 
 
 __all__ = ["open_instructions", "open_config", "open_usage_report"]

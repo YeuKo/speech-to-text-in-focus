@@ -1,7 +1,7 @@
-"""Almacenamiento seguro de la API key de OpenAI (keyring de Windows).
+"""Secure storage for the OpenAI API key (Windows credential store via keyring).
 
-Centraliza el acceso para que el backend, la CLI y la UI usen el mismo sitio.
-La key nunca se guarda en ficheros de configuración.
+Centralises access so the backend, the CLI and the UI all use the same place.
+The key is never written to configuration files.
 """
 
 from __future__ import annotations
@@ -16,30 +16,30 @@ USERNAME = "openai_api_key"
 
 
 def get_api_key() -> str | None:
-    """Devuelve la key guardada en keyring, o None si no hay o keyring falla."""
+    """Return the key stored in keyring, or None if absent or keyring fails."""
     try:
         import keyring
 
         return keyring.get_password(SERVICE, USERNAME)
     except Exception as exc:
-        log.debug("keyring no disponible: %s", exc)
+        log.debug("keyring unavailable: %s", exc)
         return None
 
 
 def set_api_key(key: str) -> bool:
-    """Guarda la key en keyring. Devuelve True si se guardó correctamente."""
+    """Store the key in keyring. Returns True if saved successfully."""
     try:
         import keyring
 
         keyring.set_password(SERVICE, USERNAME, key)
         return True
     except Exception as exc:
-        log.error("No se pudo guardar la API key: %s", exc)
+        log.error("Could not save the API key: %s", exc)
         return False
 
 
 def has_api_key(env_name: str = "OPENAI_API_KEY") -> bool:
-    """True si hay key disponible por variable de entorno o en keyring."""
+    """True if a key is available via environment variable or keyring."""
     return bool(os.environ.get(env_name) or get_api_key())
 
 

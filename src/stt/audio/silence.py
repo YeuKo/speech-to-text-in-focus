@@ -1,10 +1,10 @@
-"""Recorte de silencios de un audio.
+"""Silence trimming for an audio buffer.
 
-Elimina los tramos sin voz (cabecera, cola y pausas largas) conservando un
-pequeño margen alrededor del habla. Reduce la duración del audio que se envía
-a la API de OpenAI —y por tanto el coste, que se factura por duración— sin
-afectar a la inteligibilidad. El umbral se estima del propio audio (ruido de
-fondo), así que se adapta a cualquier micrófono.
+Removes voiceless stretches (leading, trailing and long pauses) while keeping a
+small margin around speech. This reduces the duration of the audio sent to the
+OpenAI API — and therefore the cost, which is billed by duration — without
+hurting intelligibility. The threshold is estimated from the audio itself
+(background noise), so it adapts to any microphone.
 """
 
 from __future__ import annotations
@@ -25,13 +25,13 @@ def trim_silence(
     min_threshold: float = 0.004,
     pad_ms: int = 200,
 ) -> np.ndarray:
-    """Devuelve el audio sin los tramos de silencio.
+    """Return the audio without the silent stretches.
 
-    - ``factor``: la voz es energía por encima de ruido_de_fondo * factor.
-    - ``min_threshold``: umbral mínimo absoluto (RMS) por seguridad.
-    - ``pad_ms``: margen conservado a cada lado de cada tramo de voz.
+    - ``factor``: speech is energy above background_noise * factor.
+    - ``min_threshold``: absolute minimum threshold (RMS) for safety.
+    - ``pad_ms``: margin kept on each side of every speech stretch.
 
-    Si no se detecta voz, devuelve el audio original (no arriesga a perderlo).
+    If no speech is detected, returns the original audio (never risks losing it).
     """
     if audio.size == 0:
         return audio
@@ -51,11 +51,10 @@ def trim_silence(
     if not speech.any():
         return audio
 
-    # Expandir cada tramo de voz con un margen (padding) a ambos lados.
+    # Expand each speech stretch with a margin (padding) on both sides.
     pad = max(1, int(pad_ms / frame_ms))
     keep = np.zeros(n_frames, dtype=bool)
-    idx = np.flatnonzero(speech)
-    for i in idx:
+    for i in np.flatnonzero(speech):
         keep[max(0, i - pad) : min(n_frames, i + pad + 1)] = True
 
     result = frames[keep].reshape(-1)

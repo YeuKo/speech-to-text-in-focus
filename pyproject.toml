@@ -5,14 +5,26 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "stt-dictation"
 version = "0.1.0"
-description = "Dictado por voz para Windows con Whisper (local o API de OpenAI), atajo global e inyección de texto en el foco."
+description = "Voice dictation for Windows with Whisper (local or OpenAI API): global hotkey and text injection at the cursor."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "fjgca" }]
+keywords = ["speech-to-text", "dictation", "whisper", "transcription", "windows", "voice"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Win32 (MS Windows)",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+]
 
-# Dependencias del núcleo (transcripción y audio).
-# Las específicas de Windows (atajos, portapapeles, bandeja) van en el extra [windows].
+# Core dependencies (transcription and audio).
+# Windows-specific ones (hotkeys, clipboard, tray) live in the [windows] extra.
 dependencies = [
     "faster-whisper>=1.0.0",
     "sounddevice>=0.4.6",
@@ -22,18 +34,23 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Instalar en Windows nativo:  pip install -e ".[windows]"
+# Install on native Windows:  pip install -e ".[windows]"
 windows = [
-    "keyboard>=0.13.5",     # atajos globales
-    "pyperclip>=1.8.2",     # portapapeles
-    "pystray>=0.19",        # icono en bandeja
-    "Pillow>=10.0",         # iconos para pystray
-    "keyring>=24.0",        # almacenar la API key de forma segura
+    "keyboard>=0.13.5",     # global hotkeys
+    "pyperclip>=1.8.2",     # clipboard
+    "pystray>=0.19",        # tray icon
+    "Pillow>=10.0",         # icons for pystray
+    "keyring>=24.0",        # store the API key securely
 ]
 dev = [
     "pytest>=8.0",
     "ruff>=0.4",
 ]
+
+[project.urls]
+Homepage = "https://github.com/fjgca/stt-dictation"
+Repository = "https://github.com/fjgca/stt-dictation"
+Issues = "https://github.com/fjgca/stt-dictation/issues"
 
 [project.scripts]
 stt = "stt.__main__:main"

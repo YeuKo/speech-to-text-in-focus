@@ -1,4 +1,4 @@
-"""Punto de entrada de la aplicación."""
+"""Application entry point."""
 
 from __future__ import annotations
 
@@ -19,27 +19,27 @@ log = logging.getLogger("stt")
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(prog="stt", description="Dictado por voz con Whisper.")
+    parser = argparse.ArgumentParser(prog="stt", description="Voice dictation with Whisper.")
     parser.add_argument(
         "--config",
         type=Path,
         default=None,
-        help="Ruta al fichero de configuración TOML (por defecto: config.toml si existe).",
+        help="Path to the TOML config file (default: config.toml if present).",
     )
     parser.add_argument(
         "--selftest",
         action="store_true",
-        help="Genera audio con la voz de Windows, transcribe y muestra el resultado. No requiere micro.",
+        help="Synthesize speech with the Windows voice, transcribe it and show the result. No mic needed.",
     )
     parser.add_argument(
         "--calibrate-mic",
         action="store_true",
-        help="Mide el nivel de tu micrófono y recomienda un valor para audio.silence_threshold.",
+        help="Measure your microphone level and recommend a value for audio.silence_threshold.",
     )
     parser.add_argument(
         "--set-api-key",
         action="store_true",
-        help="Guarda tu API key de OpenAI de forma segura en el almacén de Windows (keyring).",
+        help="Store your OpenAI API key securely in the Windows credential store (keyring).",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     return parser.parse_args(argv)
@@ -53,23 +53,24 @@ def _resolve_config_path(arg: Path | None) -> Path | None:
 
 
 # ---------------------------------------------------------------------------
-# Modo selftest
+# Self-test mode
 # ---------------------------------------------------------------------------
 
 _SELFTEST_TEXT = (
-    "Hola, esta es una prueba de transcripción. "
-    "El modelo reconoce anthropik, cubernetes y Grafana."
+    "Hello, this is a transcription test. "
+    "The model recognises anthropik, cubernetes and Grafana."
 )
 
 
 def _selftest(cfg: "config.Config") -> int:
     import numpy as np
+
     from stt.transcribe import create_backend
 
-    log.info("=== SELFTEST ===")
-    log.info("Texto de prueba: %r", _SELFTEST_TEXT)
+    log.info("=== SELF-TEST ===")
+    log.info("Test text: %r", _SELFTEST_TEXT)
 
-    # Generar WAV a 16 kHz mono con la voz de Windows (SAPI)
+    # Generate a 16 kHz mono WAV with the Windows voice (SAPI).
     tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
     wav_path = tmp.name
     tmp.close()
@@ -80,47 +81,46 @@ def _selftest(cfg: "config.Config") -> int:
         "16000,"
         "[System.Speech.AudioFormat.AudioBitsPerSample]::Sixteen,"
         "[System.Speech.AudioFormat.AudioChannel]::Mono); "
-        f"$s = [System.Speech.Synthesis.SpeechSynthesizer]::new(); "
+        "$s = [System.Speech.Synthesis.SpeechSynthesizer]::new(); "
         "$s.Rate = -2; "
         f'$s.SetOutputToWaveFile("{wav_path}", $fmt); '
         f'$s.Speak("{_SELFTEST_TEXT}"); '
         "$s.Dispose();"
     )
     try:
-        r = subprocess.run(
+        result = subprocess.run(
             ["powershell.exe", "-NoProfile", "-Command", ps_script],
             capture_output=True, text=True, timeout=30,
         )
-        if r.returncode != 0:
-            log.error("Error al generar audio SAPI:\n%s", r.stderr)
+        if result.returncode != 0:
+            log.error("Failed to generate SAPI audio:\n%s", result.stderr)
             return 1
     except FileNotFoundError:
-        log.error("powershell.exe no encontrado. El selftest requiere Windows.")
+        log.error("powershell.exe not found. Self-test requires Windows.")
         return 1
 
-    # Cargar WAV → numpy float32
+    # Load the WAV into a numpy float32 array.
     with wave.open(wav_path, "rb") as wf:
         raw = wf.readframes(wf.getnframes())
         sr = wf.getframerate()
         nch = wf.getnchannels()
 
-    audio = __import__("numpy").frombuffer(raw, dtype="<i2").astype("float32") / 32768.0
+    audio = np.frombuffer(raw, dtype="<i2").astype("float32") / 32768.0
     if nch > 1:
         audio = audio.reshape(-1, nch).mean(axis=1)
-    log.info("Audio generado: %.1f s a %d Hz.", len(audio) / sr, sr)
+    log.info("Generated audio: %.1f s at %d Hz.", len(audio) / sr, sr)
 
-    # Transcribir
     backend = create_backend(cfg)
     backend.load()
     prompt = postprocess.build_prompt(cfg.dictionary.terms)
     lang = cfg.engine.language if cfg.engine.language != "auto" else None
-    result = backend.transcribe(audio, sample_rate=sr, language=lang, prompt=prompt)
-    text = postprocess.apply(result.text, cfg.dictionary.replacements)
+    transcription = backend.transcribe(audio, sample_rate=sr, language=lang, prompt=prompt)
+    text = postprocess.apply(transcription.text, cfg.dictionary.replacements)
     backend.close()
 
-    log.info("Transcrito en %.1fs:", result.elapsed_s or 0)
-    log.info("  Esperado : %r", _SELFTEST_TEXT)
-    log.info("  Obtenido : %r", text)
+    log.info("Transcribed in %.1fs:", transcription.elapsed_s or 0)
+    log.info("  Expected : %r", _SELFTEST_TEXT)
+    log.info("  Got      : %r", text)
 
     try:
         os.unlink(wav_path)
@@ -131,7 +131,7 @@ def _selftest(cfg: "config.Config") -> int:
 
 
 # ---------------------------------------------------------------------------
-# Guardar API key en keyring
+# Store the API key in keyring
 # ---------------------------------------------------------------------------
 
 def _set_api_key() -> int:
@@ -139,7 +139,7 @@ def _set_api_key() -> int:
 
     from stt import keystore
 
-    print("Pega tu API key de OpenAI (no se mostrará al escribir):")
+    print("Paste your OpenAI API key (it will not be shown as you type):")
     try:
         key = getpass.getpass("API key: ").strip()
     except (EOFError, KeyboardInterrupt):
@@ -147,20 +147,20 @@ def _set_api_key() -> int:
         return 1
 
     if not key:
-        log.error("No se introdujo ninguna key.")
+        log.error("No key entered.")
         return 1
     if not key.startswith("sk-"):
-        log.warning("La key no empieza por 'sk-'; ¿seguro que es correcta? Se guardará igualmente.")
+        log.warning("The key does not start with 'sk-'; are you sure it is correct? Saving anyway.")
 
     if not keystore.set_api_key(key):
         return 1
-    log.info("API key guardada de forma segura en el almacén de Windows.")
-    log.info("Para usarla: cambia el engine a OpenAI (config o menú de la bandeja).")
+    log.info("API key stored securely in the Windows credential store.")
+    log.info("To use it: switch the engine to OpenAI (config file or tray menu).")
     return 0
 
 
 # ---------------------------------------------------------------------------
-# Calibración de micrófono
+# Microphone calibration
 # ---------------------------------------------------------------------------
 
 def _calibrate_mic(cfg: "config.Config", seconds: float = 5.0) -> int:
@@ -168,38 +168,37 @@ def _calibrate_mic(cfg: "config.Config", seconds: float = 5.0) -> int:
     import sounddevice as sd
 
     sr = cfg.audio.sample_rate
-    block = 1024
     rms_values: list[float] = []
 
-    log.info("=== CALIBRACIÓN DE MICRÓFONO ===")
-    log.info("Habla con normalidad durante %.0f segundos...", seconds)
+    log.info("=== MICROPHONE CALIBRATION ===")
+    log.info("Speak normally for %.0f seconds...", seconds)
 
     def _cb(indata, frames, t, status):
         rms_values.append(float(np.sqrt(np.mean(indata ** 2))))
 
     with sd.InputStream(samplerate=sr, channels=1, dtype="float32",
-                        blocksize=block, callback=_cb):
+                        blocksize=1024, callback=_cb):
         sd.sleep(int(seconds * 1000))
 
     if not rms_values:
-        log.error("No se capturó audio. ¿Micrófono conectado y con permisos?")
+        log.error("No audio captured. Is the microphone connected and permitted?")
         return 1
 
     arr = np.array(rms_values)
     p10, p50, p90 = (float(np.percentile(arr, p)) for p in (10, 50, 90))
-    # Umbral recomendado: a medio camino entre el silencio (p10) y la voz (p50),
-    # tirando hacia abajo para no cortar en los valles de la voz.
+    # Recommended threshold: between silence (p10) and speech (p50), leaning low
+    # so it does not cut on the valleys of speech.
     recommended = round(max(0.002, p10 + (p50 - p10) * 0.4), 4)
 
-    log.info("Niveles RMS  -> silencio≈%.4f  voz(mediana)≈%.4f  picos≈%.4f", p10, p50, p90)
-    log.info("Umbral actual: %.4f", cfg.audio.silence_threshold)
-    log.info("Recomendado  : %.4f", recommended)
-    log.info("Pon esto en config.toml [audio]:  silence_threshold = %.4f", recommended)
+    log.info("RMS levels  -> silence~%.4f  speech(median)~%.4f  peaks~%.4f", p10, p50, p90)
+    log.info("Current threshold: %.4f", cfg.audio.silence_threshold)
+    log.info("Recommended      : %.4f", recommended)
+    log.info("Put this in config.toml [audio]:  silence_threshold = %.4f", recommended)
     return 0
 
 
 # ---------------------------------------------------------------------------
-# Arranque normal (dictado)
+# Normal startup (dictation)
 # ---------------------------------------------------------------------------
 
 def main(argv: list[str] | None = None) -> int:
@@ -208,13 +207,14 @@ def main(argv: list[str] | None = None) -> int:
     try:
         cfg = config.load(resolved_config)
     except config.ConfigError as exc:
-        print(f"Error de configuración: {exc}", file=sys.stderr)
+        print(f"Configuration error: {exc}", file=sys.stderr)
         return 2
-    # Ruta para el ítem "Open config file" del tray (aunque aún no exista).
+    # Path used by the tray's "Open config file" item (even if it doesn't exist yet).
     config_path = resolved_config or Path("config.toml")
 
     logging_setup.setup(cfg.logging.level, cfg.logging.dir)
-    log.info("STT Dictation %s — backend=%s, idioma=%s", __version__, cfg.engine.backend, cfg.engine.language)
+    log.info("STT Dictation %s — backend=%s, language=%s",
+             __version__, cfg.engine.backend, cfg.engine.language)
 
     if args.set_api_key:
         return _set_api_key()
@@ -227,8 +227,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if sys.platform != "win32":
         log.error(
-            "El modo dictado requiere Windows nativo. "
-            "En WSL ejecuta: python.exe -m stt  (o usa el ejecutable en Windows)."
+            "Dictation mode requires native Windows. "
+            "From WSL run: python.exe -m stt  (or use the Windows executable)."
         )
         return 1
 
@@ -236,8 +236,8 @@ def main(argv: list[str] | None = None) -> int:
 
     controller = Controller(cfg)
 
-    # Intentar arrancar con icono en la bandeja; si pystray falla, caer a un
-    # bucle de espera simple (la app sigue funcionando, solo sin indicador).
+    # Try to start with a tray icon; if pystray fails, fall back to a simple wait
+    # loop (the app still works, just without the indicator).
     tray = None
     try:
         from stt import keystore
@@ -281,17 +281,13 @@ def main(argv: list[str] | None = None) -> int:
         )
         controller.set_on_state_change(tray.set_state)
     except Exception:
-        log.warning("No se pudo iniciar la bandeja; modo sin indicador.", exc_info=True)
+        log.warning("Could not start the tray icon; running without an indicator.", exc_info=True)
 
     try:
         controller.start()
-        log.info(
-            "Listo. Toggle=%s | Push-to-talk=%s.",
-            cfg.hotkey.toggle,
-            cfg.hotkey.push_to_talk,
-        )
+        log.info("Ready. Toggle=%s | Push-to-talk=%s.", cfg.hotkey.toggle, cfg.hotkey.push_to_talk)
         if tray is not None:
-            log.info("Icono en la bandeja activo. Usa 'Quit' en el menú para cerrar.")
+            log.info("Tray icon active. Use 'Quit' in the menu to exit.")
             if controller.startup_warning:
                 try:
                     from stt.ui.dialogs import message_box
@@ -299,11 +295,11 @@ def main(argv: list[str] | None = None) -> int:
                     message_box("STT Dictation", controller.startup_warning)
                 except Exception:
                     pass
-            tray.run()  # bloqueante hasta que se elija "Quit"
+            tray.run()  # blocks until "Quit" is chosen
         else:
-            _wait_for_ctrl_c(controller)
+            _wait_for_ctrl_c()
     except Exception:
-        log.exception("Fallo al iniciar.")
+        log.exception("Failed to start.")
         return 1
     finally:
         controller.stop()
@@ -311,15 +307,15 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-def _wait_for_ctrl_c(controller) -> None:
+def _wait_for_ctrl_c() -> None:
     stop_event = threading.Event()
 
     def _sigint(sig, frame):
-        log.info("Cerrando (Ctrl+C)...")
+        log.info("Shutting down (Ctrl+C)...")
         stop_event.set()
 
     signal.signal(signal.SIGINT, _sigint)
-    log.info("Pulsa Ctrl+C para salir.")
+    log.info("Press Ctrl+C to exit.")
     stop_event.wait()
 
 

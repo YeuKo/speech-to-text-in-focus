@@ -1,8 +1,8 @@
-"""Backend remoto con la API de transcripción de OpenAI.
+"""Remote backend using the OpenAI transcription API.
 
-La API key se lee de una variable de entorno (o del almacén seguro de Windows
-vía keyring), nunca del fichero de config. Antes de enviar, se recortan los
-silencios para reducir la duración facturada.
+The API key is read from an environment variable (or the Windows credential
+store via keyring), never from the config file. Before sending, silences are
+trimmed to reduce the billed audio duration.
 """
 
 from __future__ import annotations
@@ -26,20 +26,20 @@ log = logging.getLogger(__name__)
 
 
 def _resolve_api_key(env_name: str) -> str:
-    """Obtiene la API key de la variable de entorno o de keyring."""
+    """Get the API key from the environment variable or keyring."""
     from stt import keystore
 
     key = os.environ.get(env_name) or keystore.get_api_key()
     if key:
         return key
     raise RuntimeError(
-        f"No se encontró la API key de OpenAI. Define la variable de entorno {env_name}, "
-        "usa 'stt --set-api-key' o el menú 'Set OpenAI API key…' de la bandeja."
+        f"OpenAI API key not found. Set the {env_name} environment variable, "
+        "run 'stt --set-api-key', or use the tray menu 'Set OpenAI API key…'."
     )
 
 
 def _to_wav_bytes(audio: np.ndarray, sample_rate: int) -> bytes:
-    """Convierte audio float32 [-1,1] mono a un WAV PCM16 en memoria."""
+    """Convert mono float32 [-1,1] audio to in-memory PCM16 WAV bytes."""
     pcm16 = np.clip(audio, -1.0, 1.0)
     pcm16 = (pcm16 * 32767.0).astype("<i2")
     buf = io.BytesIO()
@@ -52,7 +52,7 @@ def _to_wav_bytes(audio: np.ndarray, sample_rate: int) -> bytes:
 
 
 class OpenAIBackend:
-    """Transcribe enviando el audio a la API de OpenAI."""
+    """Transcribe by sending the audio to the OpenAI API."""
 
     def __init__(self, config: "Config") -> None:
         self._cfg = config
@@ -60,7 +60,7 @@ class OpenAIBackend:
         self._usage = None
 
     def load(self) -> None:
-        from openai import OpenAI  # import perezoso
+        from openai import OpenAI  # lazy import
 
         api_key = _resolve_api_key(self._cfg.openai.api_key_env)
         self._client = OpenAI(api_key=api_key)
@@ -68,8 +68,8 @@ class OpenAIBackend:
             from stt.usage import UsageTracker
 
             self._usage = UsageTracker(self._cfg.usage.file, self._cfg.usage.price_per_min)
-            log.info("Seguimiento de coste activo. Total acumulado: $%.4f", self._usage.total)
-        log.info("Backend OpenAI listo (modelo %s).", self._cfg.openai.model)
+            log.info("Cost tracking enabled. Running total: $%.4f", self._usage.total)
+        log.info("OpenAI backend ready (model %s).", self._cfg.openai.model)
 
     def transcribe(
         self,
@@ -80,7 +80,7 @@ class OpenAIBackend:
         prompt: str | None = None,
     ) -> TranscriptionResult:
         if self._client is None:
-            raise RuntimeError("Backend OpenAI no inicializado: llama a load() primero.")
+            raise RuntimeError("OpenAI backend not initialised: call load() first.")
 
         started = time.monotonic()
 
@@ -90,14 +90,14 @@ class OpenAIBackend:
             trimmed_s = audio.size / sample_rate
             if trimmed_s < original_s:
                 log.info(
-                    "Silencios recortados: %.1fs -> %.1fs (se factura la duración enviada).",
+                    "Silence trimmed: %.1fs -> %.1fs (the sent duration is what's billed).",
                     original_s,
                     trimmed_s,
                 )
 
         sent_seconds = audio.size / sample_rate
         wav_bytes = _to_wav_bytes(audio, sample_rate)
-        # El SDK acepta un archivo con nombre; usamos una tupla (nombre, bytes).
+        # The SDK accepts a named file; we use a (name, bytes, mime) tuple.
         file_tuple = ("audio.wav", wav_bytes, "audio/wav")
         resp = self._client.audio.transcriptions.create(
             model=self._cfg.openai.model,

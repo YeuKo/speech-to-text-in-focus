@@ -1,4 +1,4 @@
-"""Configuración de logging: consola + fichero rotativo."""
+"""Logging configuration: console + rotating file handler."""
 
 from __future__ import annotations
 
@@ -10,10 +10,10 @@ _FMT = "%(asctime)s %(levelname)-7s %(name)s: %(message)s"
 
 
 def setup(level: str = "INFO", log_dir: str | Path = "logs") -> None:
-    """Configura el logging raíz con salida a consola y a ``log_dir/stt.log``.
+    """Configure the root logger with console and ``log_dir/stt.log`` output.
 
-    El fichero rota a 1 MB con 3 copias de respaldo. Idempotente: limpia
-    handlers previos para no duplicar líneas si se llama más de una vez.
+    The file rotates at 1 MB keeping 3 backups. Idempotent: clears previous
+    handlers so lines are not duplicated if called more than once.
     """
     root = logging.getLogger()
     root.setLevel(level.upper())
@@ -34,8 +34,8 @@ def setup(level: str = "INFO", log_dir: str | Path = "logs") -> None:
         )
         file_handler.setFormatter(fmt)
         root.addHandler(file_handler)
-    except OSError as exc:  # no debe tumbar la app por no poder escribir el log
-        root.warning("No se pudo crear el log en %s: %s", log_dir, exc)
+    except OSError as exc:  # never crash the app just because the log can't be written
+        root.warning("Could not create log file in %s: %s", log_dir, exc)
 
 
 __all__ = ["setup"]

@@ -1,87 +1,87 @@
-# Configuración de STT Dictation.
-# Copia este fichero a "config.toml" y ajústalo. config.toml está en .gitignore.
+# STT Dictation configuration.
+# Copy this file to "config.toml" and adjust it. config.toml is in .gitignore.
 
 [engine]
-# Backend de transcripción: "local" (faster-whisper) o "openai" (API).
+# Transcription backend: "local" (faster-whisper) or "openai" (API).
 backend = "local"
-# Idioma del audio en formato ISO-639-1 ("es", "en", ...) o "auto" para autodetectar.
-language = "es"
+# Audio language as ISO-639-1 ("en", "es", ...) or "auto" to autodetect.
+language = "en"
 
 [local]
-# Modelo de faster-whisper. "auto" elige según el hardware detectado:
-#   - con GPU CUDA  -> large-v3-turbo
-#   - solo CPU      -> small
-# Valores válidos: tiny, base, small, medium, large-v3, large-v3-turbo,
-#                  distil-large-v3, distil-small.en, ... o "auto".
+# faster-whisper model. "auto" picks one based on the detected hardware:
+#   - with a CUDA GPU -> large-v3-turbo
+#   - CPU only        -> small
+# Valid values: tiny, base, small, medium, large-v3, large-v3-turbo,
+#               distil-large-v3, distil-small.en, ... or "auto".
 model = "auto"
-# Dispositivo: "auto" (detecta GPU), "cuda" o "cpu".
+# Device: "auto" (detect GPU), "cuda" or "cpu".
 device = "auto"
-# Precisión de cómputo: "auto", "int8", "int8_float16", "float16", "float32".
+# Compute precision: "auto", "int8", "int8_float16", "float16", "float32".
 compute_type = "auto"
 
 [openai]
-# Modelo de la API: "gpt-4o-transcribe", "gpt-4o-mini-transcribe" o "whisper-1".
+# API model: "gpt-4o-transcribe", "gpt-4o-mini-transcribe" or "whisper-1".
 model = "gpt-4o-transcribe"
-# Nombre de la variable de entorno donde está la API key (NO se pone la key aquí).
-# Para guardarla de forma segura sin tocar este fichero: "stt --set-api-key".
+# Name of the environment variable holding the API key (do NOT put the key here).
+# To store it securely without touching this file: "stt --set-api-key".
 api_key_env = "OPENAI_API_KEY"
-# Recortar silencios antes de enviar a la API. La API factura por duración del
-# audio (también el silencio), así que esto abarata el dictado con pausas largas.
+# Trim silence before sending to the API. The API bills by audio duration
+# (silence included), so this makes dictation with long pauses cheaper.
 trim_silence = true
 
 [hotkey]
-# Atajos globales separados para cada modo. Sintaxis de la librería "keyboard".
-toggle = "ctrl+alt+space"      # pulsar para empezar / parar (o auto-stop por silencio)
-push_to_talk = "ctrl+alt+v"    # mantener pulsado mientras hablas
-# Modo por defecto si se usa una activación genérica: "toggle" o "push_to_talk".
+# Separate global shortcuts per mode. Syntax of the "keyboard" library.
+toggle = "ctrl+alt+space"      # press to start / stop (or auto-stop on silence)
+push_to_talk = "ctrl+alt+v"    # hold while speaking
+# Default mode for a generic activation: "toggle" or "push_to_talk".
 default_mode = "toggle"
 
 [audio]
-sample_rate = 16000            # Whisper trabaja a 16 kHz
+sample_rate = 16000            # Whisper works at 16 kHz
 channels = 1
-# Tiempo de silencio (ms) tras el cual se corta automáticamente en modo toggle.
+# Silence time (ms) after which recording auto-stops in toggle mode.
 silence_timeout_ms = 1500
-# Usar VAD (detección de actividad de voz) para recortar silencios.
+# Use VAD (voice-activity detection) to trim silence.
 use_vad = true
-# Umbral adaptativo: mide el ruido de fondo y ajusta el corte automáticamente.
-# Recomendado: se adapta solo a cualquier micrófono y entorno, sin calibrar.
+# Adaptive threshold: measure background noise and adjust the cut automatically.
+# Recommended: adapts on its own to any microphone and environment, no calibration.
 auto_threshold = true
-# Umbral fijo (RMS, 0-1), usado SOLO si auto_threshold = false.
-# Para ajustarlo a mano: "stt --calibrate-mic".
+# Fixed threshold (RMS, 0-1), used ONLY when auto_threshold = false.
+# To tune it manually: "stt --calibrate-mic".
 silence_threshold = 0.006
 
 [injection]
-# Cómo insertar el texto en la ventana con foco: "clipboard" (Ctrl+V) o "type" (teclear).
+# How to insert text into the focused window: "clipboard" (Ctrl+V) or "type".
 method = "clipboard"
-# Restaurar el contenido previo del portapapeles tras pegar.
+# Restore the previous clipboard contents after pasting.
 restore_clipboard = true
-# Retardo (ms) antes de pegar, para dar tiempo a que la ventana recupere el foco.
+# Delay (ms) before pasting, to let the window regain focus.
 paste_delay_ms = 80
 
 [dictionary]
-# Términos que se pasan como contexto a Whisper para mejorar nombres propios.
+# Terms passed as context to Whisper to better recognise proper nouns.
 terms = ["Anthropic", "Kubernetes", "Grafana"]
 
-# Sustituciones exactas/fuzzy aplicadas tras la transcripción ("mal" = "bien").
+# Exact/fuzzy replacements applied after transcription ("wrong" = "right").
 [dictionary.replacements]
 "anthropik" = "Anthropic"
 "cubernetes" = "Kubernetes"
 
 [usage]
-# Registrar el coste estimado de cada transcripción por API (solo backend openai).
+# Record the estimated cost of each API transcription (openai backend only).
 track = true
-# Fichero CSV donde se acumula el histórico (timestamp, modelo, segundos, coste).
+# CSV file accumulating the history (timestamp, model, seconds, cost).
 file = "logs/usage.csv"
 
-# Tarifa estimada en USD por minuto de audio, por modelo. Ajústalo si OpenAI
-# cambia los precios. El coste mostrado es una estimación, no el importe real.
+# Estimated rate in USD per minute of audio, per model. Adjust if OpenAI changes
+# pricing. The displayed cost is an estimate, not the exact billed amount.
 [usage.price_per_min]
 "gpt-4o-transcribe" = 0.006
 "gpt-4o-mini-transcribe" = 0.003
 "whisper-1" = 0.006
 
 [logging]
-# Nivel: DEBUG, INFO, WARNING, ERROR.
+# Level: DEBUG, INFO, WARNING, ERROR.
 level = "INFO"
-# Carpeta donde se escriben los logs (relativa al directorio de trabajo).
+# Folder where logs are written (relative to the working directory).
 dir = "logs"

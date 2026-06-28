@@ -1,7 +1,8 @@
-"""Sonidos de feedback audible (Windows winsound).
+"""Audible feedback sounds (Windows winsound).
 
-Cada evento tiene un patrón de tonos distinguible para reconocerlo sin mirar
-la pantalla. Se reproducen en un hilo aparte para no bloquear el pipeline.
+Each event has a distinguishable tone pattern so it can be recognised without
+looking at the screen. Sounds play on a separate thread so they don't block the
+pipeline.
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ log = logging.getLogger(__name__)
 
 
 def _play(sequence: list[tuple[int, int]]) -> None:
-    """Reproduce una secuencia de (frecuencia_hz, duración_ms) sin bloquear."""
+    """Play a sequence of (frequency_hz, duration_ms) tones without blocking."""
 
     def _run() -> None:
         try:
@@ -21,24 +22,24 @@ def _play(sequence: list[tuple[int, int]]) -> None:
 
             for freq, dur in sequence:
                 winsound.Beep(freq, dur)
-        except Exception:  # winsound no disponible (no Windows) o error de audio
+        except Exception:  # winsound unavailable (non-Windows) or audio error
             pass
 
     threading.Thread(target=_run, daemon=True).start()
 
 
 def recording_start() -> None:
-    """Inicio de grabación: dos tonos ascendentes ('listo, habla')."""
+    """Recording started: two rising tones ('ready, speak')."""
     _play([(660, 100), (990, 130)])
 
 
 def recording_stop() -> None:
-    """Fin de grabación: dos tonos descendentes ('procesando')."""
+    """Recording stopped: two falling tones ('processing')."""
     _play([(880, 100), (520, 130)])
 
 
 def error() -> None:
-    """Error: tono grave doble."""
+    """Error: low double tone."""
     _play([(300, 200), (250, 250)])
 
 

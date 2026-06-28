@@ -1,12 +1,11 @@
-"""Icono en la bandeja del sistema con indicador de estado por color y menú.
+"""System tray icon with a colour state indicator and a menu.
 
-- azul    -> en espera (idle)
-- rojo    -> grabando
-- naranja -> transcribiendo
+- blue   -> idle
+- red    -> recording
+- orange -> transcribing
 
-``run()`` es bloqueante (arranca el bucle de eventos de la bandeja) y debe
-llamarse en el hilo principal. ``set_state()`` se puede llamar desde otros hilos.
-Las etiquetas están en inglés para uso por terceros.
+``run()`` is blocking (it starts the tray event loop) and must be called on the
+main thread. ``set_state()`` is safe to call from other threads.
 """
 
 from __future__ import annotations
@@ -16,11 +15,11 @@ from collections.abc import Callable
 
 log = logging.getLogger(__name__)
 
-# RGB por estado (clave = State.value)
+# RGB per state (key = State.value)
 _COLORS: dict[str, tuple[int, int, int]] = {
-    "idle": (90, 120, 160),          # azul grisáceo
-    "recording": (220, 60, 60),      # rojo
-    "transcribing": (235, 165, 40),  # naranja
+    "idle": (90, 120, 160),          # greyish blue
+    "recording": (220, 60, 60),      # red
+    "transcribing": (235, 165, 40),  # orange
 }
 
 _LABELS: dict[str, str] = {
@@ -113,12 +112,12 @@ class TrayIcon:
             menu=menu,
         )
 
-    # Los handlers aceptan (icon, item) que pasa pystray; los ignoramos.
+    # Handlers accept the (icon, item) pystray passes; we ignore them.
     def _handle_toggle_auto(self, *args) -> None:
         try:
             self._on_toggle_auto_stop()
         except Exception:
-            log.exception("Error al cambiar el modo de auto-stop.")
+            log.exception("Error toggling auto-stop.")
         if self._icon is not None:
             self._icon.update_menu()
 
@@ -126,25 +125,25 @@ class TrayIcon:
         try:
             self._on_help()
         except Exception:
-            log.exception("Error al abrir la ayuda.")
+            log.exception("Error opening help.")
 
     def _handle_open_config(self, *args) -> None:
         try:
             self._on_open_config()
         except Exception:
-            log.exception("Error al abrir la configuración.")
+            log.exception("Error opening the config file.")
 
     def _handle_open_usage(self, *args) -> None:
         try:
             self._on_open_usage()
         except Exception:
-            log.exception("Error al abrir el informe de uso.")
+            log.exception("Error opening the usage report.")
 
     def _handle_set_engine(self, name: str) -> None:
         try:
             self._on_set_engine(name)
         except Exception:
-            log.exception("Error al cambiar de engine.")
+            log.exception("Error switching engine.")
         if self._icon is not None:
             self._icon.update_menu()
 
@@ -152,7 +151,7 @@ class TrayIcon:
         try:
             self._on_set_api_key()
         except Exception:
-            log.exception("Error al guardar la API key.")
+            log.exception("Error saving the API key.")
 
     def _handle_quit(self, *args) -> None:
         try:
@@ -161,7 +160,7 @@ class TrayIcon:
             self.stop()
 
     def set_state(self, state: str) -> None:
-        """Actualiza el color del icono y el tooltip según el estado."""
+        """Update the icon colour and tooltip based on the state."""
         if self._icon is None:
             return
         img = self._images.get(state)
@@ -170,7 +169,7 @@ class TrayIcon:
         self._icon.title = f"STT — {_LABELS.get(state, state)}"
 
     def run(self) -> None:
-        """Bloqueante: arranca el bucle de la bandeja (hilo principal)."""
+        """Blocking: start the tray event loop (main thread)."""
         self._build()
         self._icon.run()
 

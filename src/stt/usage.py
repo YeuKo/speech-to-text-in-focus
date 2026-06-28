@@ -1,9 +1,9 @@
-"""Seguimiento del coste estimado del uso de la API de transcripción.
+"""Estimated cost tracking for transcription API usage.
 
-El coste es una **estimación** basada en la duración del audio enviado y en las
-tarifas (USD/minuto) configuradas, no el importe real facturado por OpenAI
-(que no se devuelve en la respuesta). Cada transcripción se acumula en un CSV
-para poder revisar el histórico y el total gastado.
+The cost is an **estimate** based on the duration of the audio sent and the
+configured rates (USD/minute), not the exact amount billed by OpenAI (which is
+not returned in the response). Each transcription is appended to a CSV so the
+history and running total can be reviewed.
 """
 
 from __future__ import annotations
@@ -46,21 +46,21 @@ class UsageTracker:
                     except (TypeError, ValueError):
                         continue
         except OSError as exc:
-            log.debug("No se pudo leer el historial de uso: %s", exc)
+            log.debug("Could not read the usage history: %s", exc)
         return total
 
     def estimate(self, model: str, seconds: float) -> float | None:
-        """Coste estimado en la moneda configurada, o None si no hay tarifa."""
+        """Estimated cost in the configured currency, or None if no rate."""
         rate = self._rates.get(model)
         if rate is None:
             return None
         return seconds / 60.0 * rate
 
     def record(self, model: str, seconds: float) -> float | None:
-        """Estima, registra en el CSV, actualiza el total y lo deja en el log."""
+        """Estimate, append to the CSV, update the total and log it."""
         cost = self.estimate(model, seconds)
         if cost is None:
-            log.info("No hay tarifa configurada para '%s'; no se estima coste.", model)
+            log.info("No rate configured for '%s'; skipping cost estimate.", model)
             return None
 
         with self._lock:
@@ -69,7 +69,7 @@ class UsageTracker:
             self._append_row(model, seconds, cost)
 
         log.info(
-            "Coste estimado: $%.4f (%.1fs, %s) | Acumulado: $%.4f %s",
+            "Estimated cost: $%.4f (%.1fs, %s) | Total: $%.4f %s",
             cost, seconds, model, total, self._currency,
         )
         return cost
@@ -89,7 +89,7 @@ class UsageTracker:
                     f"{cost:.6f}",
                 ])
         except OSError as exc:
-            log.warning("No se pudo escribir el historial de uso: %s", exc)
+            log.warning("Could not write the usage history: %s", exc)
 
 
 __all__ = ["UsageTracker"]

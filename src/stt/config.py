@@ -1,7 +1,7 @@
-"""Carga y validación de la configuración (TOML -> dataclasses tipadas).
+"""Configuration loading and validation (TOML -> typed dataclasses).
 
-Usa solo la librería estándar (``tomllib``, disponible en Python 3.11+), de modo que
-la configuración se puede cargar y testear sin dependencias de terceros ni Windows.
+Uses only the standard library (``tomllib``, available in Python 3.11+), so the
+configuration can be loaded and tested without third-party dependencies or Windows.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, get_origin
 
 # ---------------------------------------------------------------------------
-# Valores permitidos (validación)
+# Allowed values (validation)
 # ---------------------------------------------------------------------------
 
 BACKENDS = ("local", "openai")
@@ -24,18 +24,18 @@ LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
 
 
 class ConfigError(ValueError):
-    """Error de configuración con un mensaje claro para el usuario."""
+    """Configuration error with a clear, user-facing message."""
 
 
 # ---------------------------------------------------------------------------
-# Secciones
+# Sections
 # ---------------------------------------------------------------------------
 
 
 @dataclass
 class EngineConfig:
     backend: str = "local"
-    language: str = "es"  # ISO-639-1 o "auto"
+    language: str = "auto"  # ISO-639-1 (e.g. "en", "es") or "auto" to autodetect
 
 
 @dataclass
@@ -49,7 +49,7 @@ class LocalConfig:
 class OpenAIConfig:
     model: str = "gpt-4o-transcribe"
     api_key_env: str = "OPENAI_API_KEY"
-    # Recortar silencios antes de enviar (reduce la duración facturada).
+    # Trim silence before sending (reduces the billed duration).
     trim_silence: bool = True
 
 
@@ -66,9 +66,11 @@ class AudioConfig:
     channels: int = 1
     silence_timeout_ms: int = 1500
     use_vad: bool = True
-    # Umbral adaptativo: estima el ruido de fondo y ajusta el corte solo (recomendado).
+    # Adaptive threshold: estimate background noise and adjust the cut on its own
+    # (recommended).
     auto_threshold: bool = True
-    # Umbral fijo (RMS, 0-1) usado solo si auto_threshold = false. Ver --calibrate-mic.
+    # Fixed threshold (RMS, 0-1), used only when auto_threshold = false. See
+    # --calibrate-mic.
     silence_threshold: float = 0.006
 
 
@@ -86,7 +88,7 @@ class DictionaryConfig:
 
 
 def _default_rates() -> dict[str, float]:
-    # USD por minuto de audio (estimaciones; ajústalas si OpenAI las cambia).
+    # USD per minute of audio (estimates; adjust if OpenAI changes pricing).
     return {
         "gpt-4o-transcribe": 0.006,
         "gpt-4o-mini-transcribe": 0.003,
@@ -121,18 +123,18 @@ class Config:
 
 
 # ---------------------------------------------------------------------------
-# Construcción desde dict + validación
+# Building from a dict + validation
 # ---------------------------------------------------------------------------
 
 
 def _build_section(cls: type, data: dict[str, Any], section_name: str) -> Any:
-    """Crea una dataclass a partir de un dict, rechazando claves desconocidas
-    y comprobando los tipos básicos de cada campo."""
+    """Build a dataclass from a dict, rejecting unknown keys and checking the
+    basic type of each field."""
     valid = {f.name: f for f in fields(cls)}
     unknown = set(data) - set(valid)
     if unknown:
         raise ConfigError(
-            f"[{section_name}] contiene claves desconocidas: {', '.join(sorted(unknown))}"
+            f"[{section_name}] contains unknown keys: {', '.join(sorted(unknown))}"
         )
 
     kwargs: dict[str, Any] = {}
@@ -146,9 +148,9 @@ def _build_section(cls: type, data: dict[str, Any], section_name: str) -> Any:
 
 
 def _check_type(value: Any, annotation: Any, dotted: str) -> None:
-    """Validación de tipos ligera para los tipos usados en la config."""
-    # Anotaciones vienen como strings por "from __future__ import annotations":
-    # mapeamos las pocas que usamos.
+    """Lightweight type validation for the types used in the config."""
+    # Annotations arrive as strings due to "from __future__ import annotations";
+    # we map the few we use.
     simple = {
         "str": str,
         "int": int,
@@ -163,23 +165,23 @@ def _check_type(value: Any, annotation: Any, dotted: str) -> None:
         origin = get_origin(annotation)
         expected = origin or annotation
 
-    # bool es subclase de int: no permitir bool donde se espera int y viceversa.
+    # bool is a subclass of int: don't allow bool where int is expected, or vice versa.
     if expected is int and isinstance(value, bool):
-        raise ConfigError(f"{dotted} debe ser un entero, no un booleano.")
+        raise ConfigError(f"{dotted} must be an integer, not a boolean.")
     if expected is bool and not isinstance(value, bool):
-        raise ConfigError(f"{dotted} debe ser true/false.")
-    # Aceptar enteros donde se espera un float (p. ej. 0 en vez de 0.0).
+        raise ConfigError(f"{dotted} must be true/false.")
+    # Accept integers where a float is expected (e.g. 0 instead of 0.0).
     if expected is float and isinstance(value, int) and not isinstance(value, bool):
         return
     if not isinstance(value, expected):
         raise ConfigError(
-            f"{dotted} tiene un tipo inválido: se esperaba {getattr(expected, '__name__', expected)}."
+            f"{dotted} has an invalid type: expected {getattr(expected, '__name__', expected)}."
         )
 
 
 def _one_of(value: str, allowed: tuple[str, ...], dotted: str) -> None:
     if value not in allowed:
-        raise ConfigError(f"{dotted} debe ser uno de {allowed}, no {value!r}.")
+        raise ConfigError(f"{dotted} must be one of {allowed}, not {value!r}.")
 
 
 def _validate(cfg: Config) -> None:
@@ -191,30 +193,30 @@ def _validate(cfg: Config) -> None:
     _one_of(cfg.logging.level.upper(), LOG_LEVELS, "logging.level")
 
     if cfg.audio.sample_rate <= 0:
-        raise ConfigError("audio.sample_rate debe ser positivo.")
+        raise ConfigError("audio.sample_rate must be positive.")
     if cfg.audio.channels not in (1, 2):
-        raise ConfigError("audio.channels debe ser 1 o 2.")
+        raise ConfigError("audio.channels must be 1 or 2.")
     if cfg.audio.silence_timeout_ms < 0:
-        raise ConfigError("audio.silence_timeout_ms no puede ser negativo.")
+        raise ConfigError("audio.silence_timeout_ms cannot be negative.")
     if not 0 < cfg.audio.silence_threshold < 1:
-        raise ConfigError("audio.silence_threshold debe estar entre 0 y 1 (p. ej. 0.006).")
+        raise ConfigError("audio.silence_threshold must be between 0 and 1 (e.g. 0.006).")
     if not cfg.hotkey.toggle or not cfg.hotkey.push_to_talk:
-        raise ConfigError("Los atajos hotkey.toggle y hotkey.push_to_talk no pueden estar vacíos.")
+        raise ConfigError("hotkey.toggle and hotkey.push_to_talk cannot be empty.")
     if cfg.hotkey.toggle == cfg.hotkey.push_to_talk:
-        raise ConfigError("hotkey.toggle y hotkey.push_to_talk deben ser distintos.")
+        raise ConfigError("hotkey.toggle and hotkey.push_to_talk must be different.")
     for model, rate in cfg.usage.price_per_min.items():
         if not isinstance(rate, (int, float)) or isinstance(rate, bool) or rate < 0:
-            raise ConfigError(f"usage.price_per_min['{model}'] debe ser un número >= 0.")
+            raise ConfigError(f"usage.price_per_min['{model}'] must be a number >= 0.")
 
 
 def from_dict(data: dict[str, Any]) -> Config:
-    """Construye y valida una Config a partir de un dict (p. ej. de TOML)."""
+    """Build and validate a Config from a dict (e.g. parsed from TOML)."""
     known_sections = {f.name for f in fields(Config)}
     unknown = set(data) - known_sections
     if unknown:
-        raise ConfigError(f"Secciones desconocidas en la config: {', '.join(sorted(unknown))}")
+        raise ConfigError(f"Unknown sections in the config: {', '.join(sorted(unknown))}")
 
-    # Cada sección es una dataclass; las construimos validando claves y tipos.
+    # Each section is a dataclass; build them validating keys and types.
     builders = {
         "engine": EngineConfig,
         "local": LocalConfig,
@@ -230,7 +232,7 @@ def from_dict(data: dict[str, Any]) -> Config:
     for name, cls in builders.items():
         if name in data:
             if not isinstance(data[name], dict):
-                raise ConfigError(f"La sección [{name}] debe ser una tabla TOML.")
+                raise ConfigError(f"Section [{name}] must be a TOML table.")
             kwargs[name] = _build_section(cls, data[name], name)
 
     cfg = Config(**kwargs)
@@ -239,18 +241,17 @@ def from_dict(data: dict[str, Any]) -> Config:
 
 
 def load(path: str | Path | None = None) -> Config:
-    """Carga la config desde un fichero TOML. Si ``path`` es None o no existe,
-    devuelve la configuración por defecto."""
+    """Load the config from a TOML file. If ``path`` is None, return defaults."""
     if path is None:
         return Config()
     p = Path(path)
     if not p.exists():
-        raise ConfigError(f"No existe el fichero de configuración: {p}")
+        raise ConfigError(f"Configuration file does not exist: {p}")
     try:
         with p.open("rb") as fh:
             data = tomllib.load(fh)
     except tomllib.TOMLDecodeError as exc:
-        raise ConfigError(f"Error de sintaxis TOML en {p}: {exc}") from exc
+        raise ConfigError(f"TOML syntax error in {p}: {exc}") from exc
     return from_dict(data)
 
 

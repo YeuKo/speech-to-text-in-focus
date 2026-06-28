@@ -1,1 +1,1 @@
-"""Captura de audio del micrófono y detección de actividad de voz (VAD)."""
+"""Microphone capture and voice-activity detection (VAD)."""

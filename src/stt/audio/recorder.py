@@ -1,12 +1,12 @@
-"""Captura de micrófono con sounddevice + auto-stop por silencio.
+"""Microphone capture with sounddevice + auto-stop on silence.
 
-El corte por silencio usa por defecto un **umbral adaptativo**: estima el ruido
-de fondo en tiempo real (el nivel más bajo observado) y considera "silencio"
-todo lo que esté por debajo de ese ruido multiplicado por un factor. Así se
-adapta solo a cualquier micrófono y entorno, sin necesidad de calibrar.
+Silence-based stopping uses an **adaptive threshold** by default: it estimates
+the background noise in real time (the lowest level observed) and treats as
+"silence" anything below that noise multiplied by a factor. This adapts to any
+microphone and environment on its own, with no calibration needed.
 
-Si ``audio.auto_threshold`` es False, se usa el valor fijo
-``audio.silence_threshold`` (útil para entornos muy concretos).
+If ``audio.auto_threshold`` is False, the fixed ``audio.silence_threshold`` value
+is used instead (useful for very specific environments).
 """
 
 from __future__ import annotations
@@ -24,10 +24,10 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-_WARMUP_S = 0.4          # no cortar durante los primeros 0.4 s (evita falsos positivos)
-_NOISE_FACTOR = 3.5      # se considera voz a partir de ruido_de_fondo * este factor
-_MIN_FLOOR = 0.0010      # suelo mínimo de ruido (evita umbral 0 en silencio absoluto)
-_FLOOR_RISE = 0.005      # qué rápido sube la estimación de ruido (lento)
+_WARMUP_S = 0.4          # don't cut during the first 0.4 s (avoids false positives)
+_NOISE_FACTOR = 3.5      # treat as speech above background_noise * this factor
+_MIN_FLOOR = 0.0010      # minimum noise floor (avoids a 0 threshold in dead silence)
+_FLOOR_RISE = 0.005      # how fast the noise estimate rises (slow)
 
 
 class Recorder:
@@ -72,15 +72,15 @@ class Recorder:
             callback=self._callback,
         )
         self._stream.start()
-        log.debug("Grabación iniciada (%d Hz).", self._cfg.sample_rate)
+        log.debug("Recording started (%d Hz).", self._cfg.sample_rate)
 
     def _threshold(self, rms: float) -> float:
-        """Devuelve el umbral de silencio. Adaptativo salvo override manual."""
+        """Return the silence threshold. Adaptive unless a manual override is set."""
         if not self._cfg.auto_threshold:
             return self._cfg.silence_threshold
 
-        # Estima el ruido de fondo: baja al instante hasta el mínimo observado,
-        # sube muy despacio. El resultado sigue el nivel más silencioso (ambiente).
+        # Estimate the background noise: drop instantly to the lowest observed
+        # value, rise very slowly. The result tracks the quietest (ambient) level.
         if self._noise_floor is None:
             self._noise_floor = rms
         elif rms < self._noise_floor:
@@ -104,7 +104,7 @@ class Recorder:
 
         now = time.monotonic()
         rms = float(np.sqrt(np.mean(indata ** 2)))
-        threshold = self._threshold(rms)  # actualiza el ruido también en warmup
+        threshold = self._threshold(rms)  # also updates the noise estimate during warmup
 
         if now - self._started_at < _WARMUP_S:
             self._last_speech_at = now
@@ -113,8 +113,8 @@ class Recorder:
         if rms >= threshold:
             self._last_speech_at = now
             self._speech_detected = True
-        # El auto-stop por silencio solo se activa DESPUÉS de oír voz: así, tras
-        # pulsar el atajo, hay tiempo ilimitado para empezar a hablar.
+        # Silence auto-stop only kicks in AFTER speech has been heard: this gives
+        # unlimited time to start talking after pressing the shortcut.
         elif self._speech_detected and (
             now - self._last_speech_at > self._cfg.silence_timeout_ms / 1000
         ):
@@ -122,7 +122,7 @@ class Recorder:
                 if not self._recording:
                     return
                 self._recording = False
-            log.debug("Silencio detectado (rms=%.4f < umbral=%.4f) -> auto-stop.", rms, threshold)
+            log.debug("Silence detected (rms=%.4f < threshold=%.4f) -> auto-stop.", rms, threshold)
             if self._on_auto_stop:
                 threading.Thread(target=self._on_auto_stop, daemon=True).start()
 
@@ -135,7 +135,7 @@ class Recorder:
                 self._stream.stop()
                 self._stream.close()
             except Exception as exc:
-                log.warning("Error al cerrar el stream: %s", exc)
+                log.warning("Error closing the stream: %s", exc)
             self._stream = None
 
         with self._lock:
