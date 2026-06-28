@@ -216,11 +216,14 @@ def _calibrate_mic(cfg: "config.Config", seconds: float = 5.0) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
+    resolved_config = _resolve_config_path(args.config)
     try:
-        cfg = config.load(_resolve_config_path(args.config))
+        cfg = config.load(resolved_config)
     except config.ConfigError as exc:
         print(f"Error de configuración: {exc}", file=sys.stderr)
         return 2
+    # Ruta para el ítem "Open config file" del tray (aunque aún no exista).
+    config_path = resolved_config or Path("config.toml")
 
     logging_setup.setup(cfg.logging.level, cfg.logging.dir)
     log.info("STT Dictation %s — backend=%s, idioma=%s", __version__, cfg.engine.backend, cfg.engine.language)
@@ -249,7 +252,7 @@ def main(argv: list[str] | None = None) -> int:
     # bucle de espera simple (la app sigue funcionando, solo sin indicador).
     tray = None
     try:
-        from stt.ui.help import open_instructions
+        from stt.ui.help import open_config, open_instructions, open_usage_report
         from stt.ui.tray import TrayIcon
 
         tray = TrayIcon(
@@ -259,6 +262,8 @@ def main(argv: list[str] | None = None) -> int:
             on_help=lambda: open_instructions(cfg),
             on_toggle_auto_stop=lambda: controller.set_auto_stop(not controller.is_auto_stop()),
             is_auto_stop=controller.is_auto_stop,
+            on_open_config=lambda: open_config(config_path),
+            on_open_usage=lambda: open_usage_report(cfg),
         )
         controller.set_on_state_change(tray.set_state)
     except Exception:

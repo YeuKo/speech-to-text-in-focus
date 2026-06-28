@@ -50,6 +50,8 @@ class TrayIcon:
         on_help: Callable[[], None],
         on_toggle_auto_stop: Callable[[], None],
         is_auto_stop: Callable[[], bool],
+        on_open_config: Callable[[], None],
+        on_open_usage: Callable[[], None],
     ) -> None:
         self._toggle = toggle_hotkey
         self._ptt = ptt_hotkey
@@ -57,6 +59,8 @@ class TrayIcon:
         self._on_help = on_help
         self._on_toggle_auto_stop = on_toggle_auto_stop
         self._is_auto_stop = is_auto_stop
+        self._on_open_config = on_open_config
+        self._on_open_usage = on_open_usage
         self._icon = None
         self._images = {state: _make_image(rgb) for state, rgb in _COLORS.items()}
 
@@ -72,6 +76,9 @@ class TrayIcon:
                 self._handle_toggle_auto,
                 checked=lambda item: self._is_auto_stop(),
             ),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem("Open config file", self._handle_open_config),
+            pystray.MenuItem("Usage / cost", self._handle_open_usage),
             pystray.MenuItem("Help / Instructions", self._handle_help),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Quit", self._handle_quit),
@@ -97,6 +104,18 @@ class TrayIcon:
             self._on_help()
         except Exception:
             log.exception("Error al abrir la ayuda.")
+
+    def _handle_open_config(self, *args) -> None:
+        try:
+            self._on_open_config()
+        except Exception:
+            log.exception("Error al abrir la configuración.")
+
+    def _handle_open_usage(self, *args) -> None:
+        try:
+            self._on_open_usage()
+        except Exception:
+            log.exception("Error al abrir el informe de uso.")
 
     def _handle_quit(self, *args) -> None:
         try:

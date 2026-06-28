@@ -6,17 +6,35 @@ refleja su configuración. Pensado para que otra persona entienda la app rápido
 
 from __future__ import annotations
 
+import csv
 import html
 import logging
 import os
+import shutil
 import tempfile
 import webbrowser
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from stt.config import Config
 
 log = logging.getLogger(__name__)
+
+
+def _open(path: str | Path) -> None:
+    """Abre un archivo con la aplicación por defecto del sistema."""
+    if hasattr(os, "startfile"):
+        os.startfile(str(path))  # Windows
+    else:
+        webbrowser.open(f"file://{path}")
+
+
+def _write_temp(name: str, content: str) -> str:
+    path = os.path.join(tempfile.gettempdir(), name)
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(content)
+    return path
 
 
 def _build_html(cfg: "Config") -> str:
@@ -115,16 +133,98 @@ tray icon → Quit.</p>
 def open_instructions(cfg: "Config") -> None:
     """Escribe las instrucciones a un HTML temporal y lo abre en el navegador."""
     try:
-        path = os.path.join(tempfile.gettempdir(), "stt_instructions.html")
-        with open(path, "w", encoding="utf-8") as fh:
-            fh.write(_build_html(cfg))
-        if hasattr(os, "startfile"):
-            os.startfile(path)  # Windows: abre con el navegador por defecto
-        else:
-            webbrowser.open(f"file://{path}")
+        path = _write_temp("stt_instructions.html", _build_html(cfg))
+        _open(path)
         log.info("Instrucciones abiertas: %s", path)
     except Exception:
         log.exception("No se pudieron abrir las instrucciones.")
 
 
-__all__ = ["open_instructions"]
+def open_config(config_path: str | Path, example_path: str | Path = "config.example.toml") -> None:
+    """Abre el config.toml. Si no existe, lo crea desde el ejemplo si está disponible."""
+    try:
+        p = Path(config_path)
+        if not p.exists():
+            ex = Path(example_path)
+            if ex.exists():
+                shutil.copy(ex, p)
+                log.info("Creado %s desde el ejemplo.", p)
+        if p.exists():
+            _open(p)
+        else:
+            log.warning("No hay fichero de configuración para abrir: %s", p)
+    except Exception:
+        log.exception("No se pudo abrir la configuración.")
+
+
+def _build_usage_html(cfg: "Config") -> str:
+    path = Path(cfg.usage.file)
+    rows: list[dict[str, str]] = []
+    if path.exists():
+        try:
+            with path.open(newline="", encoding="utf-8") as fh:
+                rows = list(csv.DictReader(fh))
+        except OSError as exc:
+            log.debug("No se pudo leer el uso: %s", exc)
+
+    style = (
+        "body{font-family:Segoe UI,system-ui,sans-serif;max-width:760px;margin:40px auto;"
+        "padding:0 20px;color:#1c2230;line-height:1.5;}"
+        "h1{color:#2563a8;}table{border-collapse:collapse;width:100%;margin-top:1em;}"
+        "td,th{border:1px solid #e2e6ee;padding:7px 10px;text-align:left;font-size:.95em;}"
+        "th{background:#f4f6fa;}.total{font-size:1.2em;margin:1em 0;}"
+        ".empty{background:#f4f6fa;padding:24px;border-radius:8px;text-align:center;color:#5a6072;}"
+    )
+
+    if not rows:
+        body = (
+            '<p class="empty">No transcriptions yet.<br><br>'
+            "Cost is only tracked when using the <b>openai</b> backend. "
+            "The <b>local</b> backend runs on your computer and is free.</p>"
+        )
+    else:
+        total = 0.0
+        total_secs = 0.0
+        for r in rows:
+            try:
+                total += float(r.get("cost", 0))
+                total_secs += float(r.get("seconds", 0))
+            except (TypeError, ValueError):
+                continue
+        recent = rows[-200:]
+        trail = "" if len(rows) <= 200 else f"<p>Showing the last 200 of {len(rows)} entries.</p>"
+        cells = "".join(
+            f"<tr><td>{html.escape(r.get('timestamp',''))}</td>"
+            f"<td>{html.escape(r.get('model',''))}</td>"
+            f"<td>{html.escape(r.get('seconds',''))}</td>"
+            f"<td>${html.escape(r.get('cost',''))}</td></tr>"
+            for r in recent
+        )
+        body = (
+            f'<p class="total"><b>Total estimated cost: ${total:.4f} USD</b> '
+            f"across {len(rows)} transcriptions ({total_secs/60:.1f} min of audio sent).</p>"
+            "<p style='color:#8a93a5;font-size:.9em;'>Estimate based on configured "
+            "per-minute rates, not the exact amount billed by OpenAI.</p>"
+            f"{trail}"
+            "<table><tr><th>When</th><th>Model</th><th>Seconds</th><th>Cost</th></tr>"
+            f"{cells}</table>"
+        )
+
+    return (
+        '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+        f"<title>STT Dictation — Usage &amp; Cost</title><style>{style}</style></head>"
+        f"<body><h1>💸 Usage &amp; Cost</h1>{body}</body></html>"
+    )
+
+
+def open_usage_report(cfg: "Config") -> None:
+    """Genera y abre un informe de uso/coste (siempre funciona, aun sin datos)."""
+    try:
+        path = _write_temp("stt_usage.html", _build_usage_html(cfg))
+        _open(path)
+        log.info("Informe de uso abierto: %s", path)
+    except Exception:
+        log.exception("No se pudo abrir el informe de uso.")
+
+
+__all__ = ["open_instructions", "open_config", "open_usage_report"]
