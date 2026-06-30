@@ -241,9 +241,21 @@ def main(argv: list[str] | None = None) -> int:
     tray = None
     try:
         from stt import keystore
-        from stt.ui.dialogs import ask_api_key, message_box
+        from stt.config_writer import persist_hotkey
+        from stt.ui.dialogs import ask_api_key, capture_hotkey, message_box
         from stt.ui.help import open_config, open_instructions, open_usage_report
         from stt.ui.tray import TrayIcon
+
+        def _set_hotkey(which: str) -> None:
+            controller.suspend_hotkeys()
+            combo = capture_hotkey()
+            if not combo:
+                controller.resume_hotkeys()  # cancelled: restore current hotkeys
+                return
+            ok, msg = controller.apply_hotkey(which, combo)
+            if ok:
+                persist_hotkey(config_path, which, combo)
+            message_box("Shortcut updated" if ok else "Could not set shortcut", msg, error=not ok)
 
         def _set_engine(name: str) -> None:
             if name == "openai" and not keystore.has_api_key():
@@ -267,8 +279,9 @@ def main(argv: list[str] | None = None) -> int:
                 message_box("Error", "Could not save the API key.", error=True)
 
         tray = TrayIcon(
-            toggle_hotkey=cfg.hotkey.toggle,
-            ptt_hotkey=cfg.hotkey.push_to_talk,
+            current_toggle=lambda: cfg.hotkey.toggle,
+            current_ptt=lambda: cfg.hotkey.push_to_talk,
+            on_set_hotkey=_set_hotkey,
             on_quit=controller.stop,
             on_help=lambda: open_instructions(cfg),
             on_toggle_auto_stop=lambda: controller.set_auto_stop(not controller.is_auto_stop()),

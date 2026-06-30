@@ -43,8 +43,9 @@ class TrayIcon:
     def __init__(
         self,
         *,
-        toggle_hotkey: str,
-        ptt_hotkey: str,
+        current_toggle: Callable[[], str],
+        current_ptt: Callable[[], str],
+        on_set_hotkey: Callable[[str], None],
         on_quit: Callable[[], None],
         on_help: Callable[[], None],
         on_toggle_auto_stop: Callable[[], None],
@@ -55,8 +56,9 @@ class TrayIcon:
         current_engine: Callable[[], str],
         on_set_api_key: Callable[[], None],
     ) -> None:
-        self._toggle = toggle_hotkey
-        self._ptt = ptt_hotkey
+        self._current_toggle = current_toggle
+        self._current_ptt = current_ptt
+        self._on_set_hotkey = on_set_hotkey
         self._on_quit = on_quit
         self._on_help = on_help
         self._on_toggle_auto_stop = on_toggle_auto_stop
@@ -87,15 +89,29 @@ class TrayIcon:
             ),
         )
 
+        shortcuts_menu = pystray.Menu(
+            pystray.MenuItem(
+                lambda item: f"Change toggle ({self._current_toggle()})…",
+                lambda icon, item: self._handle_set_hotkey("toggle"),
+            ),
+            pystray.MenuItem(
+                lambda item: f"Change push-to-talk ({self._current_ptt()})…",
+                lambda icon, item: self._handle_set_hotkey("push_to_talk"),
+            ),
+        )
+
         menu = pystray.Menu(
-            pystray.MenuItem(f"Toggle dictation: {self._toggle}", None, enabled=False),
-            pystray.MenuItem(f"Push-to-talk: {self._ptt}", None, enabled=False),
+            pystray.MenuItem(lambda item: f"Toggle dictation: {self._current_toggle()}",
+                             None, enabled=False),
+            pystray.MenuItem(lambda item: f"Push-to-talk: {self._current_ptt()}",
+                             None, enabled=False),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
                 "Auto-stop on silence",
                 self._handle_toggle_auto,
                 checked=lambda item: self._is_auto_stop(),
             ),
+            pystray.MenuItem("Change shortcut", shortcuts_menu),
             pystray.MenuItem("Engine", engine_menu),
             pystray.MenuItem("Set OpenAI API key…", self._handle_set_key),
             pystray.Menu.SEPARATOR,
@@ -152,6 +168,18 @@ class TrayIcon:
             self._on_set_api_key()
         except Exception:
             log.exception("Error saving the API key.")
+
+    def _handle_set_hotkey(self, which: str) -> None:
+        try:
+            self._on_set_hotkey(which)
+        except Exception:
+            log.exception("Error capturing the hotkey.")
+        self.refresh()
+
+    def refresh(self) -> None:
+        """Re-render the menu (e.g. after a hotkey or engine change)."""
+        if self._icon is not None:
+            self._icon.update_menu()
 
     def _handle_quit(self, *args) -> None:
         try:

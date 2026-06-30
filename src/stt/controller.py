@@ -45,8 +45,11 @@ class Controller:
 
         self._recorder = Recorder(config.audio, on_auto_stop=self._on_auto_stop)
         self._injector = TextInjector(config.injection)
-        self._hotkeys = HotkeyManager(
-            config.hotkey,
+        self._hotkeys = self._make_hotkeys()
+
+    def _make_hotkeys(self) -> HotkeyManager:
+        return HotkeyManager(
+            self._cfg.hotkey,
             on_toggle=self.on_toggle,
             on_ptt_press=self.on_ptt_press,
             on_ptt_release=self.on_ptt_release,
@@ -71,6 +74,41 @@ class Controller:
 
     def is_auto_stop(self) -> bool:
         return self._cfg.audio.use_vad
+
+    # --- Hotkey reconfiguration (for the tray's capture dialog) -------------
+
+    def suspend_hotkeys(self) -> None:
+        """Temporarily stop listening (so capture doesn't trigger the app)."""
+        self._hotkeys.stop()
+
+    def resume_hotkeys(self) -> None:
+        """Re-register the hotkeys from the current config."""
+        self._hotkeys = self._make_hotkeys()
+        self._hotkeys.start()
+
+    def apply_hotkey(self, which: str, combo: str) -> tuple[bool, str]:
+        """Set a new combination for "toggle" or "push_to_talk".
+
+        Assumes hotkeys are currently suspended; re-registers on the way out.
+        Reverts and reports if the combination is invalid or already in use.
+        """
+        if which not in ("toggle", "push_to_talk"):
+            self.resume_hotkeys()
+            return False, f"Unknown hotkey: {which}"
+        other = self._cfg.hotkey.push_to_talk if which == "toggle" else self._cfg.hotkey.toggle
+        if combo == other:
+            self.resume_hotkeys()
+            return False, "That combination is already used by the other mode."
+
+        previous = getattr(self._cfg.hotkey, which)
+        setattr(self._cfg.hotkey, which, combo)
+        try:
+            self.resume_hotkeys()
+        except Exception as exc:
+            setattr(self._cfg.hotkey, which, previous)
+            self.resume_hotkeys()
+            return False, f"Could not register '{combo}': {exc}"
+        return True, f"{which.replace('_', ' ')} shortcut set to: {combo}"
 
     def start(self) -> None:
         log.info("Starting controller (backend=%s)...", self._cfg.engine.backend)
