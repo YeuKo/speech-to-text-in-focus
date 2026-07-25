@@ -49,7 +49,14 @@ class Controller:
         # worker also keeps the events in order.
         self._notifier = ThreadPoolExecutor(max_workers=1, thread_name_prefix="stt-notify")
 
-        self._recorder = Recorder(config.audio, on_auto_stop=self._on_auto_stop)
+        # Text of the chunks already transcribed while the user was still
+        # talking. Only ever touched from the transcription worker.
+        self._partials: list[str] = []
+        self._recorder = Recorder(
+            config.audio,
+            on_auto_stop=self._on_auto_stop,
+            on_chunk=self._on_chunk_ready,
+        )
         self._injector = TextInjector(config.injection)
         self._hotkeys = self._make_hotkeys()
 
@@ -283,6 +290,17 @@ class Controller:
         if self._try_transition(State.RECORDING, State.TRANSCRIBING):
             self._end_recording()
 
+    def _on_chunk_ready(self, audio: np.ndarray) -> None:
+        """Queue a chunk the recorder released mid-speech.
+
+        Called from the audio callback, so it must return immediately: submitting
+        to the worker is all that happens here.
+        """
+        try:
+            self._executor.submit(self._transcribe_chunk, audio)
+        except RuntimeError:      # shutting down
+            pass
+
     def _on_auto_stop(self) -> None:
         if self._try_transition(State.RECORDING, State.TRANSCRIBING):
             self._end_recording()
@@ -314,63 +332,93 @@ class Controller:
         self._notify_user("transcribing", "Transcribing", "Processing your audio…")
         self._executor.submit(self._transcribe_and_inject, audio)
 
+    def _transcribe(self, audio: np.ndarray) -> str:
+        """Audio in, cleaned-up text out. Empty when there was nothing to say.
+
+        Shared by the chunks handed over mid-recording and by the final tail, so
+        both get the same treatment.
+        """
+        seconds = len(audio) / self._cfg.audio.sample_rate
+
+        # Never hand silence to Whisper: with nothing to decode it invents text,
+        # typically echoing the vocabulary prompt back. A recording can end up
+        # empty whenever a stray noise (a keystroke, a fan) triggers the silence
+        # auto-stop before any word was actually said.
+        if not has_speech(audio, self._cfg.audio.sample_rate):
+            log.info("No speech in %.1fs of audio, skipping transcription.", seconds)
+            return ""
+
+        # Level it out only now, after the speech check: normalising first would
+        # amplify a silent recording's noise into apparent speech.
+        if self._cfg.audio.auto_gain:
+            audio = normalise_level(audio)
+
+        lang = self._cfg.engine.language if self._cfg.engine.language != "auto" else None
+        with self._backend_lock:
+            backend = self._backend
+        result = backend.transcribe(
+            audio,
+            sample_rate=self._cfg.audio.sample_rate,
+            language=lang,
+            prompt=self._prompt,
+        )
+        text = postprocess.collapse_repeats(result.text)
+        text = postprocess.apply(text, self._cfg.dictionary.replacements)
+        if self._cfg.dictionary.fuzzy:
+            text = postprocess.apply_fuzzy(text, self._cfg.dictionary.terms)
+
+        if postprocess.is_prompt_echo(text, self._cfg.dictionary.terms):
+            # Faint noise got through the speech check and the model answered with
+            # the vocabulary list instead of a transcription.
+            log.info("Discarded a hallucinated echo of the vocabulary prompt.")
+            log.debug("Discarded text: %r", text)
+            return ""
+
+        log.info("Transcribed %.1fs of audio into %d chars in %.1fs.",
+                 seconds, len(text), result.elapsed_s or 0)
+        log.debug("Transcription text: %r", text)
+        return text
+
+    def _transcribe_chunk(self, audio: np.ndarray) -> None:
+        """Transcribe a slice handed over while the user is still talking.
+
+        Runs on the same single worker as the final tail, so the pieces can only
+        be appended in the order they were spoken. A chunk that fails is logged
+        and skipped rather than losing the whole dictation.
+        """
+        try:
+            text = self._transcribe(audio)
+            if text:
+                self._partials.append(text)
+        except Exception:
+            log.exception("Error transcribing a chunk; continuing with the rest.")
+
     def _transcribe_and_inject(self, audio: np.ndarray) -> None:
         try:
+            parts = list(self._partials)
+            self._partials.clear()
+
+            # A short tail is normal when chunking: the shortcut was released just
+            # after a cut. Only complain if there is nothing at all.
             min_samples = int(self._cfg.audio.sample_rate * _MIN_AUDIO_S)
-            if len(audio) < min_samples:
-                log.info("Audio too short, ignoring.")
-                self._notify_user("empty", "Nothing recorded", "The recording was too short.")
-                return
+            tail = self._transcribe(audio) if len(audio) >= min_samples else ""
+            if tail:
+                parts.append(tail)
 
-            # Never hand silence to Whisper: with nothing to decode it invents
-            # text, typically echoing the vocabulary prompt back. A recording can
-            # end up empty whenever a stray noise (a keystroke, a fan) triggers
-            # the silence auto-stop before any word was actually said.
-            if not has_speech(audio, self._cfg.audio.sample_rate):
-                log.info("No speech in the recording (%.1fs), skipping transcription.",
-                         len(audio) / self._cfg.audio.sample_rate)
+            text = " ".join(p.strip() for p in parts if p.strip())
+            if not text:
+                log.info("Nothing to transcribe.")
                 self._notify_user("empty", "Nothing to transcribe", "I didn't hear any speech.")
                 return
 
-            # Level it out only now, after the speech check: normalising first
-            # would amplify a silent recording's noise into apparent speech.
-            if self._cfg.audio.auto_gain:
-                audio = normalise_level(audio)
-
-            lang = self._cfg.engine.language if self._cfg.engine.language != "auto" else None
-            with self._backend_lock:
-                backend = self._backend
-            result = backend.transcribe(
-                audio,
-                sample_rate=self._cfg.audio.sample_rate,
-                language=lang,
-                prompt=self._prompt,
-            )
-            text = postprocess.collapse_repeats(result.text)
-            text = postprocess.apply(text, self._cfg.dictionary.replacements)
-            if self._cfg.dictionary.fuzzy:
-                text = postprocess.apply_fuzzy(text, self._cfg.dictionary.terms)
-            if postprocess.is_prompt_echo(text, self._cfg.dictionary.terms):
-                # Faint noise got through the speech check and the model answered
-                # with the vocabulary list instead of a transcription.
-                log.info("Discarded a hallucinated echo of the vocabulary prompt.")
-                log.debug("Discarded text: %r", text)
-                self._notify_user("empty", "Nothing to transcribe", "I didn't hear any speech.")
-            elif text:
-                # Log only the length at INFO; the full text (potentially private)
-                # is logged at DEBUG only.
-                log.info("Transcribed %d chars in %.1fs.", len(text), result.elapsed_s or 0)
-                log.debug("Transcription text: %r", text)
-                self._injector.inject(text)
-                self._notify_user("done", "Done", f"{len(text)} characters pasted at the cursor.")
-            else:
-                log.info("Empty transcription.")
-                self._notify_user("empty", "Nothing to transcribe", "No speech detected.")
+            self._injector.inject(text)
+            self._notify_user("done", "Done", f"{len(text)} characters pasted at the cursor.")
         except Exception:
             log.exception("Error during transcription.")
             sounds.error(self._cfg.feedback.sound)
             self._notify_user("error", "Transcription failed", "See logs/stt.log for details.")
         finally:
+            self._partials.clear()
             self._force_state(State.IDLE)
 
     def stop(self) -> None:

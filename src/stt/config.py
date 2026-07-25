@@ -91,6 +91,13 @@ class AudioConfig:
     # mid-thought is worse than pressing the shortcut again, and the pause that
     # feels natural differs per person. Switchable from the tray.
     auto_stop: bool = False
+    # Transcribe while you speak, in chunks of roughly this many seconds, so that
+    # releasing the shortcut leaves only the last moments to process. Chunks are
+    # cut on a pause, never mid-word. 0 transcribes everything at the end.
+    chunk_seconds: float = 6.0
+    # Cut anyway after this long without a pause, so talking non-stop still gets
+    # the benefit.
+    chunk_max_seconds: float = 20.0
     # Have Whisper skip the silent stretches of the recording. Unrelated to
     # auto_stop despite both being "VAD": this one guards against the model
     # inventing text over silence, so it stays on regardless.

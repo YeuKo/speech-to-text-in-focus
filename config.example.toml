@@ -82,6 +82,13 @@ auto_stop = false
 # auto_stop despite both being "VAD": this one keeps the model from inventing
 # text over silence, so leave it on.
 vad_filter = true
+# Transcribe as you speak, in chunks of about this many seconds, instead of
+# waiting until you finish. Cuts are made on a pause, never mid-word, so when you
+# release the shortcut only the last moments are left: measured on a 31-second
+# dictation, the wait drops from 3.8s to 0.5s. Set to 0 for the old behaviour.
+chunk_seconds = 6.0
+# Cut anyway after this long without a pause, for when you talk non-stop.
+chunk_max_seconds = 20.0
 # Adaptive threshold: measure background noise and adjust the cut automatically.
 # Recommended: adapts on its own to any microphone and environment, no calibration.
 auto_threshold = true

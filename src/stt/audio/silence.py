@@ -26,7 +26,7 @@ log = logging.getLogger(__name__)
 # RMS of ordinary speech into a nearby microphone. Used as a ceiling for the
 # adaptive threshold: without it, audio that is speech from start to end would
 # raise its own noise estimate so high that nothing counted as speech.
-_SPEECH_LEVEL = 0.02
+SPEECH_LEVEL = 0.02
 
 
 def _frame_rms(audio: np.ndarray, sample_rate: int, frame_ms: int) -> np.ndarray:
@@ -42,7 +42,7 @@ def _frame_rms(audio: np.ndarray, sample_rate: int, frame_ms: int) -> np.ndarray
 def _speech_threshold(rms: np.ndarray, factor: float, min_threshold: float) -> float:
     """Energy above which a frame counts as speech, from the audio's own noise."""
     noise_floor = float(np.percentile(rms, 10))
-    return min(max(noise_floor * factor, min_threshold), _SPEECH_LEVEL)
+    return min(max(noise_floor * factor, min_threshold), SPEECH_LEVEL)
 
 
 def has_speech(
@@ -105,7 +105,7 @@ def trim_silence(
     n_frames = rms.size
     frames = audio[: n_frames * frame_len].reshape(n_frames, frame_len)
 
-    # No _SPEECH_LEVEL ceiling here, unlike has_speech: trimming errs towards
+    # No SPEECH_LEVEL ceiling here, unlike has_speech: trimming errs towards
     # keeping audio (worst case it returns everything), so a strict threshold is
     # safe, while a decision to skip transcription must not be over-strict.
     noise_floor = float(np.percentile(rms, 10))

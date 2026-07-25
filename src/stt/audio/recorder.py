@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from stt.audio.devices import resolve_input_device
+from stt.audio.silence import SPEECH_LEVEL
 
 if TYPE_CHECKING:
     from stt.config import AudioConfig
@@ -38,11 +39,14 @@ class Recorder:
         config: "AudioConfig",
         *,
         on_auto_stop: Callable[[], None] | None = None,
+        on_chunk: Callable[[np.ndarray], None] | None = None,
     ) -> None:
         self._cfg = config
         self._on_auto_stop = on_auto_stop
+        self._on_chunk = on_chunk
         self._stream = None
         self._frames: list[np.ndarray] = []
+        self._buffered = 0            # samples held in _frames, tracked as we go
         self._lock = threading.Lock()
         self._recording = False
         self._last_speech_at = 0.0
@@ -59,6 +63,7 @@ class Recorder:
 
         with self._lock:
             self._frames = []
+            self._buffered = 0
             self._recording = True
             now = time.monotonic()
             self._started_at = now
@@ -109,7 +114,11 @@ class Recorder:
         else:
             self._noise_floor += (rms - self._noise_floor) * _FLOOR_RISE
 
-        return max(self._noise_floor * _NOISE_FACTOR, _MIN_FLOOR)
+        # Capped at the level of ordinary speech. Without the ceiling, someone who
+        # starts talking the instant they press the shortcut anchors the noise
+        # estimate to their own voice, and from then on nothing counts as speech:
+        # the auto-stop never fires and every pause check reads as silence.
+        return min(max(self._noise_floor * _NOISE_FACTOR, _MIN_FLOOR), SPEECH_LEVEL)
 
     def _callback(self, indata: np.ndarray, frames: int, sd_time, status) -> None:
         if status:
@@ -124,13 +133,19 @@ class Recorder:
             if not self._recording:
                 return
             self._frames.append(indata.copy())
-
-        if not self._cfg.auto_stop:
-            return
+            self._buffered += len(indata)
 
         now = time.monotonic()
         rms = float(np.sqrt(np.mean(indata ** 2)))
         threshold = self._threshold(rms)  # also updates the noise estimate during warmup
+
+        # Hand over a finished chunk so it can be transcribed while the user is
+        # still talking. Done before the auto-stop check because it applies
+        # whether or not stopping on silence is enabled.
+        self._maybe_emit_chunk(rms, threshold)
+
+        if not self._cfg.auto_stop:
+            return
 
         if now - self._started_at < _WARMUP_S:
             self._last_speech_at = now
@@ -152,6 +167,40 @@ class Recorder:
             if self._on_auto_stop:
                 threading.Thread(target=self._on_auto_stop, daemon=True).start()
 
+    def _maybe_emit_chunk(self, rms: float, threshold: float) -> None:
+        """Release the buffered audio as a chunk once it is long enough.
+
+        The cut waits for a pause so a word is never split in two, which would
+        cost more accuracy than the wait saves. If the speaker never pauses, the
+        chunk is released anyway at ``chunk_max_seconds``.
+
+        Runs inside the audio callback, so it only moves references around: the
+        transcription itself happens on the consumer's thread.
+        """
+        if self._on_chunk is None or self._cfg.chunk_seconds <= 0:
+            return
+
+        sample_rate = self._cfg.sample_rate
+        with self._lock:
+            seconds = self._buffered / sample_rate
+            if seconds < self._cfg.chunk_seconds:
+                return
+            if rms >= threshold and seconds < self._cfg.chunk_max_seconds:
+                return              # still mid-sentence: wait for a pause
+            frames, self._frames = self._frames, []
+            self._buffered = 0
+
+        if not frames:
+            return
+        chunk = np.concatenate(frames, axis=0)
+        if chunk.ndim > 1:
+            chunk = chunk.mean(axis=1)
+        log.debug("Chunk of %.1fs ready while recording.", len(chunk) / sample_rate)
+        try:
+            self._on_chunk(chunk.astype(np.float32))
+        except Exception:
+            log.exception("Error handing over an audio chunk.")
+
     def stop(self) -> np.ndarray:
         with self._lock:
             self._recording = False
@@ -165,7 +214,8 @@ class Recorder:
             self._stream = None
 
         with self._lock:
-            frames = list(self._frames)
+            frames, self._frames = self._frames, []
+            self._buffered = 0
 
         if not frames:
             return np.zeros(0, dtype=np.float32)

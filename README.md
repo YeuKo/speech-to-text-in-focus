@@ -18,6 +18,8 @@ private), with an optional **OpenAI API** backend for machines without a capable
 - ☁️ **OpenAI API backend** — optional fallback; switchable at runtime from the tray.
 - 🖱️ **Pastes at the cursor** — clipboard + Ctrl+V (Unicode‑safe), restoring your previous clipboard.
 - 📒 **Custom dictionary** — bias recognition toward proper nouns and fix common mistranscriptions.
+- ⚡ **Transcribes as you speak** — audio is processed in chunks cut on your pauses, so releasing the shortcut
+  leaves only the last seconds: 0.5 s of wait on a 31‑second dictation instead of 3.8 s.
 - 🔇 **Adaptive silence detection** — auto‑stops on silence, adapting to any microphone; or fully manual.
 - 🎚️ **System tray UI** — a microphone icon that colour‑codes the state, plus engine switch, settings, help and usage in one menu.
 - 🔔 **Discreet feedback** — a floating status pill plus soft Windows cues, loud beeps or complete silence. No native notifications piling up in the Action Center.
