@@ -1,10 +1,21 @@
-"""Global keyboard shortcuts: independent toggle and push-to-talk."""
+"""Global keyboard shortcuts.
+
+Two ways to trigger dictation, which can coexist:
+
+- Separate combinations for toggle and push-to-talk.
+- One combination whose *gesture* picks the mode: hold to talk, tap twice for
+  hands-free. See stt.gesture for the state machine; this module only turns key
+  events into presses and releases of that combination.
+"""
 
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING
+
+from stt.gesture import GestureRecogniser
 
 if TYPE_CHECKING:
     from stt.config import HotkeyConfig
@@ -32,6 +43,17 @@ class HotkeyManager:
         self._ptt_trigger = parts[-1]
         self._ptt_modifiers = parts[:-1]
 
+        # The gesture reuses the controller's own actions: its "start" is a
+        # push-to-talk press, and both of its ways of finishing are a release.
+        self._gesture_keys = [k.strip() for k in self._cfg.gesture.lower().split("+") if k.strip()]
+        self._gesture_held = False
+        self._gesture = GestureRecogniser(
+            on_start=_safe(on_ptt_press),
+            on_stop=_safe(on_ptt_release),
+            hold_ms=self._cfg.gesture_hold_ms,
+            double_ms=self._cfg.gesture_double_ms,
+        ) if self._gesture_keys else None
+
     def _mods_held(self) -> bool:
         import keyboard
         return all(keyboard.is_pressed(m) for m in self._ptt_modifiers)
@@ -42,6 +64,8 @@ class HotkeyManager:
         keyboard.add_hotkey(self._cfg.toggle, _safe(self._on_toggle), suppress=False)
 
         def _hook(event: keyboard.KeyboardEvent) -> None:
+            self._track_gesture(keyboard)
+
             if event.name != self._ptt_trigger:
                 return
             if event.event_type == keyboard.KEY_DOWN and self._mods_held():
@@ -54,13 +78,38 @@ class HotkeyManager:
 
         self._hook = keyboard.hook(_hook)
         log.info(
-            "Hotkeys registered — toggle: %s | push-to-talk: %s",
+            "Hotkeys registered — toggle: %s | push-to-talk: %s%s",
             self._cfg.toggle,
             self._cfg.push_to_talk,
+            f" | gesture: {self._cfg.gesture}" if self._gesture else "",
         )
+
+    def _track_gesture(self, keyboard) -> None:
+        """Turn "all the gesture's keys are down" into presses and releases.
+
+        Checked on every key event rather than bound as a hotkey: the gesture is
+        usually two modifiers with no ordinary key, which the hotkey machinery
+        does not handle, and the timing needs the exact moment of the release.
+        """
+        if self._gesture is None:
+            return
+        try:
+            held = all(keyboard.is_pressed(key) for key in self._gesture_keys)
+        except Exception:
+            return          # unknown key name: leave the gesture inactive
+
+        if held and not self._gesture_held:
+            self._gesture_held = True
+            self._gesture.press(time.monotonic())
+        elif not held and self._gesture_held:
+            self._gesture_held = False
+            self._gesture.release(time.monotonic())
 
     def stop(self) -> None:
         import keyboard
+        if self._gesture is not None:
+            self._gesture.cancel()
+            self._gesture_held = False
         try:
             keyboard.remove_all_hotkeys()
             if self._hook:

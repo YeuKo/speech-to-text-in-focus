@@ -37,6 +37,14 @@ toggle = "ctrl+alt+space"      # press to start / stop (or auto-stop on silence)
 push_to_talk = "ctrl+alt+v"    # hold while speaking
 # Default mode for a generic activation: "toggle" or "push_to_talk".
 default_mode = "toggle"
+# One combination for both modes, told apart by how you press it: hold it down to
+# talk, tap it twice for hands-free. Recording starts on the first press either
+# way, so nothing is clipped. Empty uses only the two shortcuts above.
+# Two bare modifiers work well ("ctrl+windows"): nothing types them by accident.
+gesture = ""
+# Held longer than this it is push-to-talk; shorter, it waits for a second tap.
+gesture_hold_ms = 250
+gesture_double_ms = 350
 
 [feedback]
 # How the app reports what it is doing. Also changeable from the tray menu

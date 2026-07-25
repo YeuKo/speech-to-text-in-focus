@@ -80,6 +80,16 @@ class HotkeyConfig:
     toggle: str = "ctrl+alt+space"
     push_to_talk: str = "ctrl+alt+v"
     default_mode: str = "toggle"
+    # One combination for both modes, told apart by the gesture: hold it to talk,
+    # tap it twice for hands-free. Empty disables it and only the two separate
+    # shortcuts above are used. Two modifiers on their own ("ctrl+windows") work
+    # well here — nothing types them by accident.
+    gesture: str = ""
+    # Held for longer than this, it is push-to-talk; shorter, it waits to see if a
+    # second tap arrives.
+    gesture_hold_ms: int = 250
+    # How long to wait for that second tap.
+    gesture_double_ms: int = 350
 
 
 @dataclass
