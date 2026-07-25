@@ -234,7 +234,7 @@ def _debug_keys(cfg: "config.Config", seconds: float = 20.0) -> int:
 
     def _on_event(event) -> None:
         nonlocal matched
-        name = canonical_key(event.name)
+        name = canonical_key(event.name, event.scan_code)
         if event.event_type == keyboard.KEY_DOWN:
             down.add(name)
         else:

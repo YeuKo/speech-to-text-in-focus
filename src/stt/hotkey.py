@@ -27,16 +27,53 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
-def canonical_key(name: str | None) -> str:
-    """Strip the side off a key name: "left windows" -> "windows".
+# Windows names its keys in the system's language, so a Spanish machine reports
+# "windows izquierda" and "mayusculas" where an English one says "left windows"
+# and "shift". Scan codes do not move: these are the same on every PC keyboard,
+# and they settle the modifiers without knowing any language.
+_MODIFIER_SCAN_CODES: dict[int, str] = {
+    29: "ctrl",                 # both control keys
+    42: "shift", 54: "shift",   # left and right
+    56: "alt",                  # AltGr arrives as ctrl+alt
+    91: "windows", 92: "windows",
+    58: "caps lock",
+}
 
-    Keyboards report the physical key, configurations name the logical one.
+# Side markers, in the languages Windows is likely to be running in.
+_SIDES = ("left", "right", "izquierda", "derecha", "izq", "der",
+          "gauche", "droite", "links", "rechts", "sinistra", "destra")
+
+# The few localised names worth mapping back; anything else keeps its own name.
+_KEY_ALIASES: dict[str, str] = {
+    "mayusculas": "shift", "mayúsculas": "shift", "may": "shift",
+    "control": "ctrl", "ctr": "ctrl",
+    "espacio": "space", "entrar": "enter", "intro": "enter",
+    "tabulador": "tab", "retroceso": "backspace",
+    "suprimir": "delete", "supr": "delete", "insertar": "insert",
+    "inicio": "home", "fin": "end",
+    "bloq mayus": "caps lock", "bloq mayús": "caps lock",
+}
+
+
+def canonical_key(name: str | None, scan_code: int | None = None) -> str:
+    """The language-independent name of a key, as configurations spell it.
+
+    The scan code decides for modifiers, because that is the one thing that does
+    not change with the system language. Everything else falls back to the
+    reported name, with the side stripped and the common Spanish names mapped.
     """
+    if scan_code is not None and scan_code in _MODIFIER_SCAN_CODES:
+        return _MODIFIER_SCAN_CODES[scan_code]
+
     key = (name or "").lower().strip()
-    for side in ("left ", "right "):
-        if key.startswith(side):
-            return key[len(side):]
-    return key
+    for side in _SIDES:
+        if key.startswith(f"{side} "):
+            key = key[len(side) + 1:]
+            break
+        if key.endswith(f" {side}"):
+            key = key[: -len(side) - 1]
+            break
+    return _KEY_ALIASES.get(key, key).strip()
 
 
 class HotkeyManager:
@@ -121,7 +158,7 @@ class HotkeyManager:
         if self._gesture is None:
             return
 
-        name = canonical_key(event.name)
+        name = canonical_key(event.name, getattr(event, "scan_code", None))
         if event.event_type == keyboard.KEY_DOWN:
             self._down.add(name)
         else:
