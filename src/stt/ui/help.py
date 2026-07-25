@@ -51,7 +51,7 @@ def _build_html(cfg: "Config") -> str:
     toggle = html.escape(cfg.hotkey.toggle)
     ptt = html.escape(cfg.hotkey.push_to_talk)
     backend = html.escape(cfg.engine.backend)
-    auto_stop = "on" if cfg.audio.use_vad else "off (manual)"
+    auto_stop = "on" if cfg.audio.auto_stop else "off (manual)"
     sound = _SOUND_TEXT.get(cfg.feedback.sound, html.escape(cfg.feedback.sound))
     overlay = "on" if cfg.feedback.overlay else "off"
     n_terms = len(cfg.dictionary.terms)
@@ -122,7 +122,7 @@ Windows keeps every one of them in the Action Center, which piles up fast.</div>
       to think out loud without being cut off.</li>
 </ul>
 <div class="tip">This toggle applies to the current session. To set the default
-permanently, edit <code>use_vad</code> under <code>[audio]</code> in
+permanently, edit <code>auto_stop</code> under <code>[audio]</code> in
 <code>config.toml</code>.</div>
 
 <h2>Custom words (client and product names)</h2>

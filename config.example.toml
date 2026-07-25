@@ -5,7 +5,7 @@
 # Transcription backend: "local" (faster-whisper) or "openai" (API).
 backend = "local"
 # Audio language as ISO-639-1 ("en", "es", ...) or "auto" to autodetect.
-language = "en"
+language = "auto"
 
 [local]
 # faster-whisper model. "auto" picks one based on the detected hardware:
@@ -45,7 +45,7 @@ default_mode = "toggle"
 #               follow the volume mixer (recommended)
 #   "beeps"  -> synthesized tones: loud and impossible to miss
 #   "off"    -> silent; the tray icon is the only indicator
-sound = "system"
+sound = "off"
 # Small floating pill ("Recording", "Transcribing", "Done") that fades on its own.
 # Silent and leaves no trace, so it is the default way of knowing what is going on
 # — set sound = "off" and keep just this if you prefer. Native Windows
@@ -74,8 +74,14 @@ gain = 1.0
 auto_gain = true
 # Silence time (ms) after which recording auto-stops in toggle mode.
 silence_timeout_ms = 1500
-# Use VAD (voice-activity detection) to trim silence.
-use_vad = true
+# Stop recording on its own after a pause. Off by default: being cut off
+# mid-sentence is more annoying than pressing the shortcut again, and how long a
+# natural pause lasts varies per person. Switchable from the tray menu.
+auto_stop = false
+# Have Whisper skip the silent stretches before transcribing. Nothing to do with
+# auto_stop despite both being "VAD": this one keeps the model from inventing
+# text over silence, so leave it on.
+vad_filter = true
 # Adaptive threshold: measure background noise and adjust the cut automatically.
 # Recommended: adapts on its own to any microphone and environment, no calibration.
 auto_threshold = true

@@ -37,6 +37,32 @@ class TestFeedbackSection:
             config.from_dict({"feedback": {"volume": 5}})
 
 
+class TestAudioDefaults:
+    def test_auto_stop_is_off_and_the_vad_filter_is_on(self):
+        """Turning auto-stop off must not stop Whisper skipping silence: that is
+        what keeps it from inventing text over a pause."""
+        cfg = config.from_dict({})
+        assert cfg.audio.auto_stop is False
+        assert cfg.audio.vad_filter is True
+
+
+class TestRenamedKeys:
+    def test_use_vad_still_configures_auto_stop(self, caplog):
+        """An existing config.toml must keep meaning what its author intended."""
+        cfg = config.from_dict({"audio": {"use_vad": True}})
+        assert cfg.audio.auto_stop is True
+        assert cfg.audio.vad_filter is True      # untouched by the old key
+        assert "use_vad" in caplog.text
+
+    def test_the_new_name_wins_when_both_are_present(self):
+        cfg = config.from_dict({"audio": {"use_vad": True, "auto_stop": False}})
+        assert cfg.audio.auto_stop is False
+
+    def test_the_old_name_is_still_type_checked(self):
+        with pytest.raises(config.ConfigError, match="true/false"):
+            config.from_dict({"audio": {"use_vad": "yes"}})
+
+
 class TestRetiredKeys:
     def test_a_removed_setting_does_not_stop_the_app(self, caplog):
         """A config.toml written by an older version must still load."""

@@ -15,7 +15,7 @@ import wave
 from collections.abc import Callable
 from pathlib import Path
 
-from stt import __version__, config, logging_setup, paths, postprocess
+from stt import __version__, config, logging_setup, paths, postprocess, single_instance
 
 log = logging.getLogger("stt")
 
@@ -48,6 +48,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--set-api-key",
         action="store_true",
         help="Store your OpenAI API key securely in the Windows credential store (keyring).",
+    )
+    parser.add_argument(
+        "--allow-multiple",
+        action="store_true",
+        help="Start even if another copy is already running (they will share the "
+             "shortcuts, so expect a fight over the microphone).",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     return parser.parse_args(argv)
@@ -299,6 +305,16 @@ def main(argv: list[str] | None = None) -> int:
             "From WSL run: python.exe -m stt  (or use the Windows executable)."
         )
         return 1
+
+    # Before anything grabs the microphone or the shortcuts.
+    if not args.allow_multiple and not single_instance.acquire():
+        _fatal(
+            "Already running",
+            "Speech to Text in Focus is already running — look for the microphone "
+            "in the system tray.\n\nIf you really want a second copy (to test a "
+            "different configuration), start it with --allow-multiple.",
+        )
+        return 3
 
     from stt.controller import Controller
 

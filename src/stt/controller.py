@@ -142,11 +142,11 @@ class Controller:
         With False, recording only stops when the shortcut is pressed again
         (manual mode): it allows arbitrarily long pauses.
         """
-        self._cfg.audio.use_vad = enabled
+        self._cfg.audio.auto_stop = enabled
         log.info("Silence auto-stop: %s", "ON" if enabled else "OFF (manual)")
 
     def is_auto_stop(self) -> bool:
-        return self._cfg.audio.use_vad
+        return self._cfg.audio.auto_stop
 
     # --- Hotkey reconfiguration (for the tray's capture dialog) -------------
 

@@ -125,7 +125,7 @@ class Recorder:
                 return
             self._frames.append(indata.copy())
 
-        if not self._cfg.use_vad:
+        if not self._cfg.auto_stop:
             return
 
         now = time.monotonic()

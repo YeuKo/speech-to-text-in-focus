@@ -28,6 +28,15 @@ OVERLAY_POSITIONS = ("bottom-right", "bottom-left", "top-right", "top-left")
 LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
 
 
+# Settings that changed name. The old key keeps working, mapped to the new one.
+RENAMED_KEYS: dict[str, dict[str, str]] = {
+    # use_vad used to control two unrelated things: stopping the recording on
+    # silence, and asking Whisper to skip silent stretches. Turning the first one
+    # off silently disabled the second, which is part of what stops the model
+    # inventing text over silence.
+    "audio": {"use_vad": "auto_stop"},
+}
+
 # Settings removed along the way, kept here so an older config.toml still loads.
 RETIRED_KEYS: dict[str, tuple[str, ...]] = {
     # Native tray balloons: replaced by the floating status pill because Windows
@@ -78,7 +87,14 @@ class AudioConfig:
     sample_rate: int = 16000
     channels: int = 1
     silence_timeout_ms: int = 1500
-    use_vad: bool = True
+    # Stop recording on its own after a pause. Off by default: being cut off
+    # mid-thought is worse than pressing the shortcut again, and the pause that
+    # feels natural differs per person. Switchable from the tray.
+    auto_stop: bool = False
+    # Have Whisper skip the silent stretches of the recording. Unrelated to
+    # auto_stop despite both being "VAD": this one guards against the model
+    # inventing text over silence, so it stays on regardless.
+    vad_filter: bool = True
     # Adaptive threshold: estimate background noise and adjust the cut on its own
     # (recommended).
     auto_threshold: bool = True
@@ -175,6 +191,18 @@ def _build_section(cls: type, data: dict[str, Any], section_name: str) -> Any:
     """Build a dataclass from a dict, rejecting unknown keys and checking the
     basic type of each field."""
     valid = {f.name: f for f in fields(cls)}
+
+    # A renamed setting keeps working under its old name, so upgrading never
+    # silently changes what someone configured on purpose.
+    renames = RENAMED_KEYS.get(section_name, {})
+    if any(old in data for old in renames):
+        data = dict(data)
+        for old, new in renames.items():
+            if old in data:
+                value = data.pop(old)
+                if new not in data:        # an explicit new key wins
+                    data[new] = value
+                log.warning("[%s] %s is now called %s.", section_name, old, new)
 
     # Settings that used to exist are ignored with a note rather than rejected:
     # a config file written by an older version must never stop the app booting.

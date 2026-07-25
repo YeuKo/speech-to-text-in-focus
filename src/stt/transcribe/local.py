@@ -87,7 +87,7 @@ class LocalWhisperBackend:
         kwargs = dict(
             language=None if language in (None, "auto") else language,
             initial_prompt=prompt,
-            vad_filter=self._cfg.audio.use_vad,
+            vad_filter=self._cfg.audio.vad_filter,
             # Whisper decodes 30-second windows and, by default, feeds what it just
             # produced back in as context for the next one. That helps a coherent
             # narration, but it is also the classic cause of the model getting stuck
