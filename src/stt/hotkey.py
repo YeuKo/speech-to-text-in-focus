@@ -27,6 +27,18 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
+def canonical_key(name: str | None) -> str:
+    """Strip the side off a key name: "left windows" -> "windows".
+
+    Keyboards report the physical key, configurations name the logical one.
+    """
+    key = (name or "").lower().strip()
+    for side in ("left ", "right "):
+        if key.startswith(side):
+            return key[len(side):]
+    return key
+
+
 class HotkeyManager:
     def __init__(
         self,
@@ -50,8 +62,9 @@ class HotkeyManager:
         # The gesture reuses the controller's own actions: its "start" is a
         # push-to-talk press, and both of its ways of finishing are a release.
         gesture = self._cfg.gesture if self._cfg.mode == "gesture" else ""
-        self._gesture_keys = [k.strip() for k in gesture.lower().split("+") if k.strip()]
+        self._gesture_keys = [canonical_key(k) for k in gesture.split("+") if k.strip()]
         self._gesture_held = False
+        self._down: set[str] = set()
         self._gesture = GestureRecogniser(
             on_start=_safe(on_ptt_press),
             on_stop=_safe(on_ptt_release),
@@ -70,7 +83,7 @@ class HotkeyManager:
             keyboard.add_hotkey(self._cfg.toggle, _safe(self._on_toggle), suppress=False)
 
         def _hook(event: keyboard.KeyboardEvent) -> None:
-            self._track_gesture(keyboard)
+            self._track_gesture(keyboard, event)
 
             if self._cfg.mode != "separate":
                 return
@@ -92,20 +105,29 @@ class HotkeyManager:
             log.info("Shortcuts registered — toggle: %s | push-to-talk: %s",
                      self._cfg.toggle, self._cfg.push_to_talk)
 
-    def _track_gesture(self, keyboard) -> None:
+    def _track_gesture(self, keyboard, event) -> None:
         """Turn "all the gesture's keys are down" into presses and releases.
 
-        Checked on every key event rather than bound as a hotkey: the gesture is
-        usually two modifiers with no ordinary key, which the hotkey machinery
-        does not handle, and the timing needs the exact moment of the release.
+        The set of held keys is built from the events themselves rather than
+        asked of ``keyboard.is_pressed``: that call depends on the library
+        resolving names like "windows" to the right scan codes, which is exactly
+        the layer most likely to differ between keyboards. What arrives in the
+        event is what the keyboard actually sent.
+
+        Checked on every event rather than bound as a hotkey because the gesture
+        is usually two modifiers with no ordinary key — which the hotkey
+        machinery does not handle — and the timing needs the moment of release.
         """
         if self._gesture is None:
             return
-        try:
-            held = all(keyboard.is_pressed(key) for key in self._gesture_keys)
-        except Exception:
-            return          # unknown key name: leave the gesture inactive
 
+        name = canonical_key(event.name)
+        if event.event_type == keyboard.KEY_DOWN:
+            self._down.add(name)
+        else:
+            self._down.discard(name)
+
+        held = all(key in self._down for key in self._gesture_keys)
         if held and not self._gesture_held:
             self._gesture_held = True
             self._gesture.press(time.monotonic())
@@ -118,6 +140,7 @@ class HotkeyManager:
         if self._gesture is not None:
             self._gesture.cancel()
             self._gesture_held = False
+            self._down.clear()
         try:
             keyboard.remove_all_hotkeys()
             if self._hook:
@@ -137,4 +160,4 @@ def _safe(fn: Callable[[], None]) -> Callable[[], None]:
     return wrapper
 
 
-__all__ = ["HotkeyManager"]
+__all__ = ["HotkeyManager", "canonical_key"]

@@ -45,6 +45,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="List the microphones you can record from (for audio.input_device).",
     )
     parser.add_argument(
+        "--debug-keys",
+        action="store_true",
+        help="Show what your keyboard reports for 20 seconds, and whether the "
+             "configured gesture matches. Use it when a shortcut does nothing.",
+    )
+    parser.add_argument(
         "--set-api-key",
         action="store_true",
         help="Store your OpenAI API key securely in the Windows credential store (keyring).",
@@ -207,6 +213,58 @@ def _list_devices() -> int:
     return 0
 
 
+def _debug_keys(cfg: "config.Config", seconds: float = 20.0) -> int:
+    """Show what the keyboard actually reports, and whether the gesture matches.
+
+    When a shortcut "does nothing", the question is always the same: is the key
+    arriving, and under what name? Everything else is guesswork without this.
+    """
+    import keyboard
+
+    from stt.hotkey import canonical_key
+
+    wanted = [canonical_key(k) for k in cfg.hotkey.gesture.split("+") if k.strip()]
+    down: set[str] = set()
+    seen: set[str] = set()
+    matched = False
+
+    print(f"Watching the keyboard for {seconds:.0f} seconds.")
+    print(f"Configured gesture: {cfg.hotkey.gesture!r} -> looking for {wanted}")
+    print("Press it a few times: hold it, and tap it twice.\n")
+
+    def _on_event(event) -> None:
+        nonlocal matched
+        name = canonical_key(event.name)
+        if event.event_type == keyboard.KEY_DOWN:
+            down.add(name)
+        else:
+            down.discard(name)
+        seen.add(name)
+        hit = bool(wanted) and all(k in down for k in wanted)
+        matched = matched or hit
+        print(f"  {event.event_type:4s} name={str(event.name)!r:16s} "
+              f"canonical={name!r:12s} scan={event.scan_code:<5} "
+              f"held={sorted(down)}{'   <-- GESTURE MATCHES' if hit else ''}")
+
+    keyboard.hook(_on_event)
+    time.sleep(seconds)
+    keyboard.unhook_all()
+
+    print("\n--- summary ---")
+    print(f"Keys seen: {sorted(seen) if seen else 'NONE — no key events arrived at all'}")
+    if not wanted:
+        print("No gesture configured.")
+    elif matched:
+        print(f"The gesture {wanted} was detected: the keyboard side works.")
+    else:
+        missing = [k for k in wanted if k not in seen]
+        print(f"The gesture {wanted} never matched.")
+        if missing:
+            print(f"Never arrived under that name: {missing}")
+            print("Use one of the names listed above in [hotkey] gesture instead.")
+    return 0
+
+
 def _calibrate_mic(cfg: "config.Config", seconds: float = 5.0) -> int:
     import numpy as np
     import sounddevice as sd
@@ -295,6 +353,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.list_devices:
         return _list_devices()
+
+    if args.debug_keys:
+        return _debug_keys(cfg)
 
     if args.calibrate_mic:
         return _calibrate_mic(cfg)

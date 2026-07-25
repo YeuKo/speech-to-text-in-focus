@@ -238,7 +238,11 @@ _MODIFIERS: tuple[tuple[str, str], ...] = (
 )
 
 # Keys offered as the final key: label shown -> name the "keyboard" library uses.
+_NO_KEY = "(none)"
+
 _KEYS: tuple[tuple[str, str], ...] = (
+    # First, so a combination can be taken back to modifiers only.
+    (_NO_KEY, ""),
     *[(c, c.lower()) for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ"],
     *[(d, d) for d in "0123456789"],
     *[(f"F{i}", f"f{i}") for i in range(1, 13)],
@@ -332,7 +336,8 @@ def build_hotkey(
         key_row = tk.Frame(root)
         key_row.grid(row=2, column=0, columnspan=4, sticky="w", padx=16, pady=(10, 0))
         tk.Label(key_row, text="Key:", font=("Segoe UI", 10)).pack(side="left")
-        key_var = tk.StringVar(value=_LABEL_BY_KEY.get(current_key, ""))
+        current_label = _LABEL_BY_KEY.get(current_key, _NO_KEY if modifiers_only else "")
+        key_var = tk.StringVar(value=current_label)
         key_box = ttk.Combobox(key_row, textvariable=key_var, state="readonly",
                                width=12, values=[label for label, _ in _KEYS])
         key_box.pack(side="left", padx=8)
