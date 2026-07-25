@@ -31,14 +31,47 @@ trim_silence = true
 
 [hotkey]
 # Separate global shortcuts per mode. Syntax of the "keyboard" library.
+# The tray menu ("Change shortcut") offers a list of ready-made combinations,
+# including ctrl+shift+z and ctrl+shift+x for either mode.
 toggle = "ctrl+alt+space"      # press to start / stop (or auto-stop on silence)
 push_to_talk = "ctrl+alt+v"    # hold while speaking
 # Default mode for a generic activation: "toggle" or "push_to_talk".
 default_mode = "toggle"
 
+[feedback]
+# How the app reports what it is doing. Also changeable from the tray menu
+# ("Feedback"); changes made there are written back to this file.
+#   "system" -> Windows' own speech cues from %WINDIR%\Media: soft and they
+#               follow the volume mixer (recommended)
+#   "beeps"  -> synthesized tones: loud and impossible to miss
+#   "off"    -> silent; the tray icon is the only indicator
+sound = "system"
+# Small floating pill ("Recording", "Transcribing", "Done") that fades on its own.
+# Silent and leaves no trace, so it is the default way of knowing what is going on
+# — set sound = "off" and keep just this if you prefer. Native Windows
+# notifications were tried and removed: they pile up in the Action Center.
+overlay = true
+# Corner it appears in, taskbar excluded: "bottom-right" (next to the tray),
+# "bottom-left", "top-right" or "top-left".
+overlay_position = "bottom-right"
+
 [audio]
 sample_rate = 16000            # Whisper works at 16 kHz
 channels = 1
+# Which microphone to record from. "auto" follows the Windows default — which is
+# often NOT the one you talk into (a headset left plugged in wins over the laptop
+# array). Put part of a device name here, list them with "stt --list-devices", or
+# pick one from the tray menu -> Microphone.
+input_device = "auto"
+# Input gain applied while recording. Raise it if you have to lean into the
+# microphone to be heard: it also makes speech detection more sensitive, since
+# that is what decides when you started talking. "stt --calibrate-mic" measures
+# your voice and suggests a value.
+gain = 1.0
+# Even out the volume before transcribing, so speech from across the room reaches
+# the model as loudly as speech into the microphone. This is what a browser's
+# automatic gain control does for a web app, and Whisper transcribes better for it.
+auto_gain = true
 # Silence time (ms) after which recording auto-stops in toggle mode.
 silence_timeout_ms = 1500
 # Use VAD (voice-activity detection) to trim silence.
@@ -59,8 +92,15 @@ restore_clipboard = true
 paste_delay_ms = 80
 
 [dictionary]
-# Terms passed as context to Whisper to better recognise proper nouns.
+# Names passed to Whisper as context so it spells them your way: clients, people,
+# products, jargon. Editable from the tray menu → "Custom words…".
+# It is a hint, not a rule: keep it to a dozen or so terms, since a long list
+# dilutes the effect (Whisper only reads ~224 tokens of context).
 terms = ["Anthropic", "Kubernetes", "Grafana"]
+# Also correct words that merely *resemble* a term (needs rapidfuzz, already a
+# dependency). Catches names the model spelled phonetically ("iber drola"), at the
+# risk of rewriting an ordinary word that happens to look like one of your terms.
+fuzzy = false
 
 # Exact/fuzzy replacements applied after transcription ("wrong" = "right").
 [dictionary.replacements]

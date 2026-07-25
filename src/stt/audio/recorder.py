@@ -19,6 +19,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from stt.audio.devices import resolve_input_device
+
 if TYPE_CHECKING:
     from stt.config import AudioConfig
 
@@ -64,15 +66,34 @@ class Recorder:
             self._noise_floor = None
             self._speech_detected = False
 
-        self._stream = sd.InputStream(
+        device = resolve_input_device(self._cfg.input_device)
+        try:
+            self._stream = self._open_stream(sd, device)
+        except Exception as exc:
+            if device is None:
+                raise
+            # The chosen microphone may be gone (headset unplugged) or busy. Keep
+            # dictation working on the default rather than failing outright.
+            log.warning(
+                "Could not open microphone %r (%s); falling back to the Windows default.",
+                self._cfg.input_device, exc,
+            )
+            self._stream = self._open_stream(sd, None)
+
+        self._stream.start()
+        log.debug("Recording started (%d Hz, device=%s, gain=%.1fx).",
+                  self._cfg.sample_rate,
+                  "default" if device is None else device, self._cfg.gain)
+
+    def _open_stream(self, sd, device: int | None):
+        return sd.InputStream(
             samplerate=self._cfg.sample_rate,
             channels=self._cfg.channels,
             dtype="float32",
             blocksize=1024,
+            device=device,
             callback=self._callback,
         )
-        self._stream.start()
-        log.debug("Recording started (%d Hz).", self._cfg.sample_rate)
 
     def _threshold(self, rms: float) -> float:
         """Return the silence threshold. Adaptive unless a manual override is set."""
@@ -93,6 +114,11 @@ class Recorder:
     def _callback(self, indata: np.ndarray, frames: int, sd_time, status) -> None:
         if status:
             log.debug("sounddevice: %s", status)
+
+        # Gain is applied here, before anything else looks at the audio, so the
+        # silence detection below becomes more sensitive by the same amount.
+        if self._cfg.gain != 1.0:
+            indata = np.clip(indata * self._cfg.gain, -1.0, 1.0)
 
         with self._lock:
             if not self._recording:

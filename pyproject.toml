@@ -46,11 +46,15 @@ dev = [
     "pytest>=8.0",
     "ruff>=0.4",
 ]
+# Build the portable release:  pip install -e ".[windows,build]" && python scripts/build.py
+build = [
+    "pyinstaller>=6.6",
+]
 
 [project.urls]
-Homepage = "https://github.com/fjgca/stt-dictation"
-Repository = "https://github.com/fjgca/stt-dictation"
-Issues = "https://github.com/fjgca/stt-dictation/issues"
+Homepage = "https://github.com/YeuKo/speech-to-text-in-focus"
+Repository = "https://github.com/YeuKo/speech-to-text-in-focus"
+Issues = "https://github.com/YeuKo/speech-to-text-in-focus/issues"
 
 [project.scripts]
 stt = "stt.__main__:main"
@@ -61,6 +65,11 @@ where = ["src"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+
+# Pinned explicitly: ruff's default rule set grows between releases, and CI must
+# not start failing because a newer version decided to check something else.
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

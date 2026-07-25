@@ -1,0 +1,67 @@
+# Build the portable Windows release and attach it to a GitHub release.
+#
+#   git tag v0.1.0 && git push origin v0.1.0
+#
+# Has to run on Windows: PyInstaller bundles the binaries of the platform it runs
+# on, and this app is Windows-only anyway.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:        # lets you build a zip without tagging
+
+permissions:
+  contents: write           # needed to create the release
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install the app and the build tools
+        run: pip install -e ".[windows,build]"
+
+      - name: Run the tests
+        run: pytest -q
+
+      - name: Build
+        run: python scripts/build.py
+
+      # Kept even for tag builds: if creating the release fails, the zip is still
+      # downloadable from the run.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stt-dictation-win64
+          path: dist/*.zip
+          if-no-files-found: error
+
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+          generate_release_notes: true
+          body: |
+            ## Install
+
+            Download the zip, unzip it anywhere you can write to, and run `stt.exe`.
+            A microphone appears in the system tray.
+
+            **First run takes a few minutes**: the speech model (1.6 GB with an
+            NVIDIA GPU, 464 MB on CPU) is downloaded from Hugging Face and cached in
+            `%USERPROFILE%\.cache\huggingface`. The floating note tells you while it
+            happens.
+
+            **Windows will warn you.** The executable is not code-signed, so
+            SmartScreen shows *"Windows protected your PC"* the first time:
+            *More info → Run anyway*.
+
+            Requires Windows 10/11. An NVIDIA GPU with the CUDA 12.x runtime is used
+            when present; otherwise it runs on the CPU with a smaller model.

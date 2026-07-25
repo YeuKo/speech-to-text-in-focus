@@ -67,7 +67,8 @@ def detect(device: str = "auto", compute_type: str = "auto") -> Hardware:
         resolved_compute = compute_type
 
     hw = Hardware(device=resolved_device, compute_type=resolved_compute, has_cuda=has_cuda)
-    log.info("Hardware: device=%s compute_type=%s (cuda=%s)", hw.device, hw.compute_type, hw.has_cuda)
+    log.info("Hardware: device=%s compute_type=%s (cuda=%s)",
+             hw.device, hw.compute_type, hw.has_cuda)
     return hw
 
 

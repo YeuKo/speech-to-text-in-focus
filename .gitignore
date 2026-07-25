@@ -5,34 +5,43 @@ __pycache__/
 .eggs/
 build/
 dist/
+
+# PyInstaller writes .spec files next to whatever it builds, but packaging/stt.spec
+# is ours and hand-written: without it the release cannot be built.
 *.spec
+!packaging/stt.spec
 
 # Virtual envs
 .venv/
 venv/
 env/
 
-# Config local con secretos / preferencias del usuario
+# Local config: holds personal preferences and paths
 config.toml
 config.local.toml
 
-# Modelos de Whisper descargados (pesan mucho)
+# Downloaded Whisper models (large)
 models/
 *.bin
 *.pt
 
-# Logs e historial
+# Logs and usage history
 logs/
 *.log
 history/
 
-# IDE / SO
+# Editors, tools and OS
 .vscode/
 .idea/
+.claude/
+.ruff_cache/
 .DS_Store
 Thumbs.db
 
-# Tests / cobertura
+# Tests and coverage
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Internal planning notes, superseded by the README
+PLAN.md

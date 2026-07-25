@@ -10,10 +10,12 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import wave
+from collections.abc import Callable
 from pathlib import Path
 
-from stt import __version__, config, logging_setup, postprocess
+from stt import __version__, config, logging_setup, paths, postprocess
 
 log = logging.getLogger("stt")
 
@@ -29,12 +31,18 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--selftest",
         action="store_true",
-        help="Synthesize speech with the Windows voice, transcribe it and show the result. No mic needed.",
+        help="Synthesize speech with the Windows voice, transcribe it and show the "
+             "result. No mic needed.",
     )
     parser.add_argument(
         "--calibrate-mic",
         action="store_true",
         help="Measure your microphone level and recommend a value for audio.silence_threshold.",
+    )
+    parser.add_argument(
+        "--list-devices",
+        action="store_true",
+        help="List the microphones you can record from (for audio.input_device).",
     )
     parser.add_argument(
         "--set-api-key",
@@ -45,11 +53,22 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _resolve_config_path(arg: Path | None) -> Path | None:
-    if arg is not None:
-        return arg
-    default = Path("config.toml")
-    return default if default.exists() else None
+def _fatal(title: str, message: str) -> None:
+    """Report a startup failure through every channel available.
+
+    A packaged build runs without a console, so a message on stderr would vanish;
+    the dialog is the only thing the user would ever see.
+    """
+    print(f"{title}: {message}", file=sys.stderr)
+    log.error("%s: %s", title, message)
+    if paths.is_frozen():
+        try:
+            from stt.ui.dialogs import message_box
+
+            message_box(title, message, error=True)
+            time.sleep(8)   # daemon thread: give the dialog time to be read
+        except Exception:
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -163,21 +182,45 @@ def _set_api_key() -> int:
 # Microphone calibration
 # ---------------------------------------------------------------------------
 
+def _list_devices() -> int:
+    from stt.audio.devices import list_input_devices
+
+    devices = list_input_devices()
+    if not devices:
+        log.error("No microphones found.")
+        return 1
+
+    print("Microphones available for recording:\n")
+    for dev in devices:
+        mark = "*" if dev.is_default else " "
+        print(f" {mark} {dev.name}   ({dev.channels} ch)")
+    print("\n  * = Windows default (what audio.input_device = \"auto\" uses)")
+    print("\nTo pick one, put part of its name in config.toml:")
+    print('  [audio]\n  input_device = "Microphone Array"')
+    print("Or choose it from the tray menu -> Microphone.")
+    return 0
+
+
 def _calibrate_mic(cfg: "config.Config", seconds: float = 5.0) -> int:
     import numpy as np
     import sounddevice as sd
+
+    from stt.audio.devices import describe_current, resolve_input_device
 
     sr = cfg.audio.sample_rate
     rms_values: list[float] = []
 
     log.info("=== MICROPHONE CALIBRATION ===")
-    log.info("Speak normally for %.0f seconds...", seconds)
+    log.info("Microphone: %s", describe_current(cfg.audio.input_device))
+    log.info("Current gain: %.1fx", cfg.audio.gain)
+    log.info("Speak normally, from where you usually sit, for %.0f seconds...", seconds)
 
     def _cb(indata, frames, t, status):
         rms_values.append(float(np.sqrt(np.mean(indata ** 2))))
 
+    device = resolve_input_device(cfg.audio.input_device)
     with sd.InputStream(samplerate=sr, channels=1, dtype="float32",
-                        blocksize=1024, callback=_cb):
+                        blocksize=1024, device=device, callback=_cb):
         sd.sleep(int(seconds * 1000))
 
     if not rms_values:
@@ -194,6 +237,24 @@ def _calibrate_mic(cfg: "config.Config", seconds: float = 5.0) -> int:
     log.info("Current threshold: %.4f", cfg.audio.silence_threshold)
     log.info("Recommended      : %.4f", recommended)
     log.info("Put this in config.toml [audio]:  silence_threshold = %.4f", recommended)
+
+    # Speech is detected from about 0.004 RMS upwards (see audio/silence.py), so a
+    # quiet microphone needs gain before that check can see it at all.
+    _TARGET_SPEECH = 0.05
+    if p50 < 0.02:
+        suggested = min(20.0, round(_TARGET_SPEECH / max(p50, 0.001), 1))
+        log.warning(
+            "Your speech is quiet (%.4f). The recording works, but detection is "
+            "close to its floor: it may not notice you started talking, and you "
+            "would have to lean into the microphone.", p50,
+        )
+        log.warning("Try this in config.toml [audio]:  gain = %.1f", suggested)
+        log.warning(
+            "If that is not the microphone you speak into, list them with "
+            "'stt --list-devices' and pick one (tray menu -> Microphone)."
+        )
+    else:
+        log.info("Speech level is healthy; no extra gain needed.")
     return 0
 
 
@@ -203,24 +264,31 @@ def _calibrate_mic(cfg: "config.Config", seconds: float = 5.0) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
-    resolved_config = _resolve_config_path(args.config)
+    resolved_config = paths.resolve_config(args.config)
     try:
         cfg = config.load(resolved_config)
     except config.ConfigError as exc:
-        print(f"Configuration error: {exc}", file=sys.stderr)
+        _fatal("Configuration error", str(exc))
         return 2
     # Path used by the tray's "Open config file" item (even if it doesn't exist yet).
-    config_path = resolved_config or Path("config.toml")
+    config_path = resolved_config or paths.app_dir() / paths.CONFIG_NAME
+    # Anchor logs and the usage file to the folder holding the config, so a
+    # packaged app never writes relative to whatever directory it was started in.
+    data_dir = paths.anchor(cfg, resolved_config)
 
     logging_setup.setup(cfg.logging.level, cfg.logging.dir)
     log.info("STT Dictation %s — backend=%s, language=%s",
              __version__, cfg.engine.backend, cfg.engine.language)
+    log.info("Config: %s | data: %s", resolved_config or "defaults", data_dir)
 
     if args.set_api_key:
         return _set_api_key()
 
     if args.selftest:
         return _selftest(cfg)
+
+    if args.list_devices:
+        return _list_devices()
 
     if args.calibrate_mic:
         return _calibrate_mic(cfg)
@@ -241,21 +309,30 @@ def main(argv: list[str] | None = None) -> int:
     tray = None
     try:
         from stt import keystore
-        from stt.config_writer import persist_hotkey
-        from stt.ui.dialogs import ask_api_key, capture_hotkey, message_box
+        from stt.config_writer import persist_hotkey, persist_value
+        from stt.ui.dialogs import ask_api_key, build_hotkey, edit_terms, message_box
         from stt.ui.help import open_config, open_instructions, open_usage_report
+        from stt.ui.overlay import StatusOverlay
         from stt.ui.tray import TrayIcon
 
-        def _set_hotkey(which: str) -> None:
-            controller.suspend_hotkeys()
-            combo = capture_hotkey()
-            if not combo:
-                controller.resume_hotkeys()  # cancelled: restore current hotkeys
-                return
-            ok, msg = controller.apply_hotkey(which, combo)
-            if ok:
-                persist_hotkey(config_path, which, combo)
-            message_box("Shortcut updated" if ok else "Could not set shortcut", msg, error=not ok)
+        overlay = StatusOverlay(cfg.feedback.overlay_position)
+        _template = paths.bundled_file(paths.TEMPLATE_NAME)
+
+        def _set_hotkey(which: str, done: Callable[[], None]) -> None:
+            """Open the builder for one mode; apply and persist what it returns."""
+            def _apply(combo: str) -> None:
+                controller.suspend_hotkeys()
+                ok, msg = controller.apply_hotkey(which, combo)
+                if ok:
+                    persist_hotkey(config_path, which, combo)
+                else:
+                    message_box("Could not set shortcut", msg, error=True)
+                done()
+
+            labels = {"toggle": "toggle dictation", "push_to_talk": "push-to-talk"}
+            current = cfg.hotkey.toggle if which == "toggle" else cfg.hotkey.push_to_talk
+            other = cfg.hotkey.push_to_talk if which == "toggle" else cfg.hotkey.toggle
+            build_hotkey(labels[which], current, other, _apply)
 
         def _set_engine(name: str) -> None:
             if name == "openai" and not keystore.has_api_key():
@@ -269,30 +346,71 @@ def main(argv: list[str] | None = None) -> int:
             if not ok:
                 message_box("Could not switch engine", msg, error=True)
 
+        def _set_sound(mode: str) -> None:
+            controller.set_sound_mode(mode)
+            persist_value(config_path, "feedback", "sound", mode)
+
+        def _toggle_overlay() -> None:
+            enabled = not controller.overlay_enabled()
+            controller.set_overlay(enabled)
+            persist_value(config_path, "feedback", "overlay", enabled)
+            if not enabled:
+                overlay.hide()
+
+        def _user_event(kind: str, title: str, message: str) -> None:
+            """Single sink for pipeline events; each channel opts in separately."""
+            if cfg.feedback.overlay:
+                overlay.show(kind, title)
+
+        def _set_microphone(name: str) -> None:
+            controller.set_microphone(name)   # picked up by the next recording
+            persist_value(config_path, "audio", "input_device", name)
+
+        def _edit_terms_dialog() -> None:
+            def _save(terms: list[str]) -> None:
+                controller.set_terms(terms)   # applies to the next dictation
+                if not persist_value(config_path, "dictionary", "terms", terms):
+                    message_box(
+                        "Could not save the custom words",
+                        "The list is active for this session but could not be written "
+                        "to config.toml. See logs/stt.log.",
+                        error=True,
+                    )
+
+            edit_terms(controller.current_terms(), _save)
+
         def _set_api_key_dialog() -> None:
-            key = ask_api_key()
-            if not key:
-                return
-            if keystore.set_api_key(key):
-                message_box("API key saved", "Your OpenAI API key was saved securely.")
-            else:
-                message_box("Error", "Could not save the API key.", error=True)
+            def _save(key: str) -> None:
+                if keystore.set_api_key(key):
+                    message_box("API key saved", "Your OpenAI API key was saved securely.")
+                else:
+                    message_box("Error", "Could not save the API key.", error=True)
+
+            ask_api_key(_save)
 
         tray = TrayIcon(
             current_toggle=lambda: cfg.hotkey.toggle,
             current_ptt=lambda: cfg.hotkey.push_to_talk,
             on_set_hotkey=_set_hotkey,
-            on_quit=controller.stop,
+            on_quit=lambda: (controller.stop(), overlay.stop()),
             on_help=lambda: open_instructions(cfg),
             on_toggle_auto_stop=lambda: controller.set_auto_stop(not controller.is_auto_stop()),
             is_auto_stop=controller.is_auto_stop,
-            on_open_config=lambda: open_config(config_path),
+            on_open_config=lambda: open_config(config_path, _template),
             on_open_usage=lambda: open_usage_report(cfg),
             on_set_engine=_set_engine,
             current_engine=controller.current_backend,
             on_set_api_key=_set_api_key_dialog,
+            on_set_sound=_set_sound,
+            current_sound=controller.sound_mode,
+            on_toggle_overlay=_toggle_overlay,
+            overlay_enabled=controller.overlay_enabled,
+            on_edit_terms=_edit_terms_dialog,
+            on_set_microphone=_set_microphone,
+            current_microphone=controller.current_microphone,
         )
         controller.set_on_state_change(tray.set_state)
+        controller.set_on_notify(_user_event)
     except Exception:
         log.warning("Could not start the tray icon; running without an indicator.", exc_info=True)
 
@@ -317,6 +435,15 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         controller.stop()
 
+    log.info("Stopped.")
+    if tray is not None:
+        # A tray app has to vanish the instant Quit is pressed. Returning normally
+        # would not: at interpreter exit, concurrent.futures joins its worker
+        # threads, so a transcription still in flight (or a stuck keyboard hook)
+        # would keep the process alive with no icon left to stop it. Nothing is
+        # pending — log records are flushed as they are written and each
+        # transcription's usage is recorded when it finishes — so exit now.
+        os._exit(0)
     return 0
 
 

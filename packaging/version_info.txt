@@ -1,0 +1,32 @@
+# Windows version resource for stt.exe: what the Properties dialog and
+# SmartScreen show. Keep the version in step with stt.__version__.
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=(0, 1, 0, 0),
+    prodvers=(0, 1, 0, 0),
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0),
+  ),
+  kids=[
+    StringFileInfo([
+      StringTable(
+        "040904B0",
+        [
+          StringStruct("CompanyName", "YeuKo"),
+          StringStruct("FileDescription", "STT Dictation — voice dictation with Whisper"),
+          StringStruct("FileVersion", "0.1.0"),
+          StringStruct("InternalName", "stt"),
+          StringStruct("LegalCopyright", "MIT licensed"),
+          StringStruct("OriginalFilename", "stt.exe"),
+          StringStruct("ProductName", "STT Dictation"),
+          StringStruct("ProductVersion", "0.1.0"),
+        ],
+      )
+    ]),
+    VarFileInfo([VarStruct("Translation", [0x0409, 0x04B0])]),
+  ],
+)

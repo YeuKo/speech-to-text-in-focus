@@ -17,6 +17,8 @@ import webbrowser
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from stt.audio.devices import describe_current
+
 if TYPE_CHECKING:
     from stt.config import Config
 
@@ -38,11 +40,22 @@ def _write_temp(name: str, content: str) -> str:
     return path
 
 
+_SOUND_TEXT = {
+    "system": "Windows sounds (soft)",
+    "beeps": "beeps (loud)",
+    "off": "silent",
+}
+
+
 def _build_html(cfg: "Config") -> str:
     toggle = html.escape(cfg.hotkey.toggle)
     ptt = html.escape(cfg.hotkey.push_to_talk)
     backend = html.escape(cfg.engine.backend)
     auto_stop = "on" if cfg.audio.use_vad else "off (manual)"
+    sound = _SOUND_TEXT.get(cfg.feedback.sound, html.escape(cfg.feedback.sound))
+    overlay = "on" if cfg.feedback.overlay else "off"
+    n_terms = len(cfg.dictionary.terms)
+    microphone = html.escape(describe_current(cfg.audio.input_device))
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -83,9 +96,21 @@ browser, editor, chat, email.</p>
     <td>Hold while speaking, release to transcribe.</td>
   </tr>
 </table>
-<p>You hear a rising beep when recording starts and a falling beep when it stops.
-The tray icon turns <span style="color:#dc3c3c">red</span> while recording and
-<span style="color:#e0a528">orange</span> while transcribing.</p>
+<h2>How you know what it is doing</h2>
+<p>The microphone in the tray turns <span style="color:#dc3c3c">red</span> while
+recording and <span style="color:#e0a528">orange</span> while transcribing; hover it
+to see the state and the shortcut to press next.</p>
+<p>Under tray → <b>Feedback</b> you pick how you are told, in two independent
+channels:</p>
+<ul>
+  <li><b>Sound</b> — <i>Windows sounds</i> (soft, follow your volume), <i>Beeps</i>
+      (loud) or <i>Silent</i>. Currently: <b>{sound}</b>.</li>
+  <li><b>Floating status pill</b> — a small note above the tray that says what is
+      happening and fades on its own. Currently: <b>{overlay}</b>.</li>
+</ul>
+<div class="tip">The pill is the quiet option: set the sound to <i>Silent</i> and
+you still see everything. Native Windows notifications were tried and removed —
+Windows keeps every one of them in the Action Center, which piles up fast.</div>
 
 <h2>Stop modes (tray menu)</h2>
 <p>Right-click the tray icon and toggle <b>“Auto-stop on silence”</b>:</p>
@@ -100,9 +125,21 @@ The tray icon turns <span style="color:#dc3c3c">red</span> while recording and
 permanently, edit <code>use_vad</code> under <code>[audio]</code> in
 <code>config.toml</code>.</div>
 
-<h2>Custom words (proper nouns)</h2>
-<p>Add names or jargon under <code>[dictionary]</code> in <code>config.toml</code>
-so they are recognised correctly (e.g. brand names, people, technical terms).</p>
+<h2>Custom words (client and product names)</h2>
+<p>Tray → <b>Custom words…</b> opens a list, one name per line. They are sent to
+Whisper as context before each transcription, so it spells them the way you wrote
+them. Changes apply to your next dictation — no restart.</p>
+<p>It biases the model, it does not force it: expect a clear improvement on names
+it was mangling, not perfection. Keep the list to <b>a dozen or so</b> names —
+Whisper only reads about 224 tokens of context, so a long list dilutes every
+entry. Currently loaded: <b>{n_terms}</b>.</p>
+<div class="tip">Set <code>fuzzy = true</code> under <code>[dictionary]</code> in
+<code>config.toml</code> and near-misses are fixed after transcribing:
+<i>iberdrolla</i> → <b>Iberdrola</b>, <i>telefonica</i> → <b>Telefónica</b>. It only
+looks at words of five letters or more, so everyday words are safe. When a name
+comes out split in two ("iber drola"), similarity cannot see it — add an exact fix
+under <code>[dictionary.replacements]</code>
+(<code>"iber drola" = "Iberdrola"</code>), which always works.</div>
 
 <h2>Local vs OpenAI</h2>
 <p>Switch anytime from the tray menu → <b>Engine</b> (or set <code>backend</code>
@@ -121,8 +158,22 @@ under <code>[engine]</code> in <code>config.toml</code>):</p>
 <ul>
   <li><b>It cuts me off too soon</b> — turn off “Auto-stop on silence”, or raise
       <code>silence_timeout_ms</code> in <code>config.toml</code>.</li>
-  <li><b>Shortcut does nothing</b> — another app may use the same combo; change
-      <code>toggle</code> / <code>push_to_talk</code> in <code>config.toml</code>.</li>
+  <li><b>Nothing is pasted although I recorded</b> — if the recording caught no
+      speech (a stray noise can trigger the auto-stop before you say anything) it
+      is discarded on purpose rather than transcribed: asked to transcribe
+      silence, Whisper invents text — usually your own vocabulary list. The log
+      says <code>No speech in the recording</code>.</li>
+  <li><b>It only hears me if I lean into the microphone</b> — first check
+      tray → <b>Microphone</b>: <i>Windows default</i> is often not the one you talk
+      into (a plugged-in headset outranks the laptop's array). Currently recording
+      from <b>{microphone}</b>. If that is right, run
+      <code>stt --calibrate-mic</code>: it measures your voice and suggests a
+      <code>gain</code> for <code>config.toml</code>. Browsers apply automatic gain
+      control to the microphone, which is why the same voice sounds louder in a web
+      page than in an app that records the raw signal.</li>
+  <li><b>Shortcut does nothing</b> — another app is probably using the same
+      combination. Build a different one in tray → <b>Change shortcut</b>: tick the
+      modifiers, pick a key, and it warns you about the risky ones.</li>
   <li><b>Text doesn't paste</b> — some elevated windows block paste; try a normal
       app first. Logs are in <code>logs/stt.log</code>.</li>
 </ul>

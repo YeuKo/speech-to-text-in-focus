@@ -1,0 +1,35 @@
+# Tests and lint on every push and pull request.
+#
+# Runs on Linux on purpose: the logic under test (config, dictionary, silence
+# detection, device selection, path resolution) is platform-independent, and the
+# Windows-only parts are behind lazy imports so they never load here. Tests that
+# do need a Windows library skip themselves via importorskip.
+name: ci
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install
+        run: pip install -e ".[dev]"
+
+      - name: Lint
+        run: ruff check src tests scripts
+
+      - name: Test
+        run: pytest -q
