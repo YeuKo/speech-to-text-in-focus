@@ -9,7 +9,7 @@ description = "Voice dictation for Windows with Whisper (local or OpenAI API): g
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-authors = [{ name = "fjgca" }]
+authors = [{ name = "YeuKo" }]
 keywords = ["speech-to-text", "dictation", "whisper", "transcription", "windows", "voice"]
 classifiers = [
     "Development Status :: 4 - Beta",

@@ -246,4 +246,4 @@ tests and run on any platform; the Windows‑specific parts are tested manually.
 
 ## License
 
-[MIT](LICENSE) © fjgca
+[MIT](LICENSE) © YeuKo
