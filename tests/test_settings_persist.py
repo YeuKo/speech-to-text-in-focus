@@ -19,6 +19,7 @@ SETTINGS_FROM_THE_MENU = {
     "on_set_sound",
     "on_toggle_overlay",
     "on_set_microphone",
+    "on_set_language",
     "on_set_mode",
     "on_edit_terms",
     "on_set_hotkey",

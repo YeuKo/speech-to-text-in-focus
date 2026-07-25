@@ -35,7 +35,7 @@ trim_silence = true
 #   "gesture"  -> ONE shortcut: hold it to talk, tap it twice for hands-free
 #   "separate" -> TWO shortcuts, one per mode
 # Changeable from the tray menu → Change shortcut.
-mode = "separate"
+mode = "gesture"
 # Used when mode = "gesture". Two bare modifiers work well here: nothing types
 # them by accident. Recording starts on the first press either way, so the
 # beginning of a sentence is never clipped.

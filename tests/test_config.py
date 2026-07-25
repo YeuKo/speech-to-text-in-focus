@@ -64,8 +64,12 @@ class TestRenamedKeys:
 
 
 class TestShortcutMode:
-    def test_defaults_to_two_shortcuts(self):
-        assert config.from_dict({}).hotkey.mode == "separate"
+    def test_defaults_to_the_single_gesture(self):
+        """One shortcut that decides the mode by how it is pressed beats having to
+        remember two, so it is what a new install gets."""
+        cfg = config.from_dict({})
+        assert cfg.hotkey.mode == "gesture"
+        assert cfg.hotkey.gesture                # never left without a way to dictate
 
     @pytest.mark.parametrize("mode", config.SHORTCUT_MODES)
     def test_accepts_both_modes(self, mode):

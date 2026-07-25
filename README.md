@@ -13,7 +13,8 @@ private), with an optional **OpenAI API** backend for machines without a capable
 
 ## Features
 
-- 🎙️ **Global hotkeys** — toggle mode (press to start/stop) and push‑to‑talk, independently configurable.
+- 🎙️ **One shortcut, two gestures** — hold it to talk, tap it twice for hands‑free. Or keep two separate
+  shortcuts if you prefer; either way, only the mode you chose is listening.
 - 🧠 **Local Whisper** via [`faster-whisper`](https://github.com/SYSTRAN/faster-whisper) — free, private, GPU‑accelerated.
 - ☁️ **OpenAI API backend** — optional fallback; switchable at runtime from the tray.
 - 🖱️ **Pastes at the cursor** — clipboard + Ctrl+V (Unicode‑safe), restoring your previous clipboard.
@@ -80,13 +81,17 @@ The app starts in the **system tray**. Then:
 
 | Action | How |
 |---|---|
-| **Dictate (toggle)** | Press `Ctrl+Alt+Space`, speak, press again (or stop on silence). |
-| **Dictate (push‑to‑talk)** | Hold `Ctrl+Alt+V` while speaking, release to transcribe. |
-| **Switch engine / mode** | Right‑click the tray icon → *Engine* / *Auto‑stop on silence*. |
-| **Change a shortcut** | Tray menu → *Change shortcut* → tick Ctrl/Alt/Shift/Win and pick a key. |
+| **Dictate** | Hold `Ctrl+Win` and speak. Release, and the text is pasted where your cursor is. |
+| **Dictate hands‑free** | Tap `Ctrl+Win` twice. It keeps recording until you press it once more. |
+| **Change the shortcut** | Tray menu → *Change shortcut*: pick one shortcut with gestures, or two separate ones. |
+| **Language** | Tray menu → *Language*. Forcing the wrong one makes Whisper translate rather than fail. |
+| **Microphone** | Tray menu → *Microphone*. |
 | **Sound / status pill** | Tray menu → *Feedback*. |
 | **Settings, help, usage** | Tray menu → *Open config file* / *Help* / *Usage / cost*. |
 | **Quit** | Tray menu → *Quit*. |
+
+Everything you change from the menu is written to `config.toml` straight away, so it
+is still there next time.
 
 Shortcuts and everything else are configured in `config.toml` (see `config.example.toml`).
 
@@ -112,6 +117,22 @@ Two things differ from dictating in a browser tab:
    recording before transcribing, and `gain` raises the captured signal itself,
    which also makes the “did they start talking?” detection more sensitive. Run
    `stt --calibrate-mic` and it suggests a value for your voice and distance.
+
+### It transcribes while you speak
+
+Rather than waiting for you to finish, the audio is transcribed in chunks as it
+arrives, cut on your pauses so a word is never split. When you release the
+shortcut only the last seconds are left to process.
+
+Measured on this project, with a 31‑second dictation on an NVIDIA GPU:
+
+| | Wait after releasing the shortcut |
+|---|---|
+| Transcribing everything at the end | 3.83 s |
+| Transcribing in chunks | **0.50 s** |
+
+Both produce the same text. Set `chunk_seconds = 0` under `[audio]` to go back to
+transcribing everything at the end.
 
 ## Local vs OpenAI
 
@@ -242,8 +263,8 @@ tests and run on any platform; the Windows‑specific parts are tested manually.
 - [x] Adaptive silence detection and manual mode
 - [x] Tray UI, custom dictionary, cost tracking
 - [x] Portable Windows build (PyInstaller)
+- [x] Gesture shortcut, chunked transcription, microphone picker
 - [ ] Signed installer with auto-start
-- [ ] Streaming / partial results
 - [ ] Per‑application profiles
 
 ## License

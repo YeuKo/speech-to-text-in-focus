@@ -456,6 +456,10 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 message_box("Could not switch shortcut mode", msg, error=True)
 
+        def _set_language(code: str) -> None:
+            controller.set_language(code)
+            persist_value(config_path, "engine", "language", code)
+
         def _set_microphone(name: str) -> None:
             controller.set_microphone(name)   # picked up by the next recording
             persist_value(config_path, "audio", "input_device", name)
@@ -502,6 +506,8 @@ def main(argv: list[str] | None = None) -> int:
             on_edit_terms=_edit_terms_dialog,
             on_set_microphone=_set_microphone,
             current_microphone=controller.current_microphone,
+            on_set_language=_set_language,
+            current_language=controller.current_language,
             current_gesture=lambda: cfg.hotkey.gesture,
             current_mode=controller.shortcut_mode,
             on_set_mode=_set_mode,

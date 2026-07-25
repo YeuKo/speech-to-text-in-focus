@@ -129,6 +129,21 @@ class Controller:
         self._prompt = postprocess.build_prompt(terms)
         log.info("Custom words updated (%d terms).", len(terms))
 
+    # --- Language -----------------------------------------------------------
+
+    def current_language(self) -> str:
+        return self._cfg.engine.language
+
+    def set_language(self, code: str) -> None:
+        """Set the dictation language ("auto" to let the model decide).
+
+        Read afresh on every transcription, so it applies to the next dictation
+        without reloading the model. Worth having within reach: with the language
+        forced to the wrong one, Whisper does not fail — it quietly translates.
+        """
+        self._cfg.engine.language = code
+        log.info("Language: %s", code)
+
     # --- Microphone ---------------------------------------------------------
 
     def current_microphone(self) -> str:

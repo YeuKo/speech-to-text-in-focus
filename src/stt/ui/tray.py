@@ -28,6 +28,18 @@ _LABELS: dict[str, str] = {
     "transcribing": "Transcribing…",
 }
 
+# Languages offered in the menu. Not the ninety-nine Whisper knows: the ones worth
+# one click, with any other ISO-639-1 code still settable in config.toml.
+_LANGUAGES: tuple[tuple[str, str], ...] = (
+    ("auto", "Detect automatically"),
+    ("es", "Español"),
+    ("en", "English"),
+    ("fr", "Français"),
+    ("de", "Deutsch"),
+    ("it", "Italiano"),
+    ("pt", "Português"),
+)
+
 # Sound modes offered in the menu: config value -> label.
 _SOUND_LABELS: tuple[tuple[str, str], ...] = (
     ("system", "Windows sounds (soft)"),
@@ -83,6 +95,8 @@ class TrayIcon:
         on_edit_terms: Callable[[], None],
         on_set_microphone: Callable[[str], None],
         current_microphone: Callable[[], str],
+        on_set_language: Callable[[str], None],
+        current_language: Callable[[], str],
         current_gesture: Callable[[], str],
         current_mode: Callable[[], str],
         on_set_mode: Callable[[str], None],
@@ -106,6 +120,8 @@ class TrayIcon:
         self._on_edit_terms = on_edit_terms
         self._on_set_microphone = on_set_microphone
         self._current_microphone = current_microphone
+        self._on_set_language = on_set_language
+        self._current_language = current_language
         self._current_gesture = current_gesture
         self._current_mode = current_mode
         self._on_set_mode = on_set_mode
@@ -184,6 +200,7 @@ class TrayIcon:
             ),
             pystray.MenuItem("Change shortcut", shortcuts_menu),
             pystray.MenuItem("Microphone", self._microphone_menu()),
+            pystray.MenuItem("Language", self._language_menu()),
             pystray.MenuItem("Feedback", feedback_menu),
             pystray.MenuItem("Custom words…", self._handle_edit_terms),
             pystray.MenuItem("Engine", engine_menu),
@@ -209,6 +226,21 @@ class TrayIcon:
             return f"Hold {combo} to talk · tap twice for hands-free"
         return (f"Toggle: {_fmt_combo(self._current_toggle())} · "
                 f"Hold: {_fmt_combo(self._current_ptt())}")
+
+    def _language_menu(self):
+        """Radio list of languages. Forcing the wrong one makes Whisper translate
+        rather than fail, which is confusing enough to deserve a menu."""
+        import pystray
+
+        def _item(code: str, label: str):
+            return pystray.MenuItem(
+                label,
+                lambda icon, item: self._handle_set_language(code),
+                checked=lambda item: self._current_language() == code,
+                radio=True,
+            )
+
+        return pystray.Menu(*[_item(code, label) for code, label in _LANGUAGES])
 
     def _microphone_menu(self):
         """Radio list of the available microphones, built once at startup.
@@ -266,6 +298,13 @@ class TrayIcon:
             self._on_edit_terms()
         except Exception:
             log.exception("Error opening the custom-words editor.")
+
+    def _handle_set_language(self, code: str) -> None:
+        try:
+            self._on_set_language(code)
+        except Exception:
+            log.exception("Error switching language.")
+        self.refresh()
 
     def _handle_set_microphone(self, name: str) -> None:
         try:

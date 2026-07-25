@@ -86,6 +86,9 @@ class LocalWhisperBackend:
         started = time.monotonic()
         kwargs = dict(
             language=None if language in (None, "auto") else language,
+            # Transcribe, never translate. It is the default, but stating it means
+            # a future default cannot silently turn dictation into translation.
+            task="transcribe",
             initial_prompt=prompt,
             vad_filter=self._cfg.audio.vad_filter,
             # Whisper decodes 30-second windows and, by default, feeds what it just

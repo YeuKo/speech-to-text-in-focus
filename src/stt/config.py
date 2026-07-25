@@ -85,7 +85,7 @@ class HotkeyConfig:
     #   "gesture"  -> one shortcut for both: hold it to talk, tap it twice for
     #                 hands-free. Only the chosen mode's shortcuts are registered,
     #                 so there is never a second combination doing something else.
-    mode: str = "separate"
+    mode: str = "gesture"
     toggle: str = "ctrl+alt+space"
     push_to_talk: str = "ctrl+alt+v"
     # The single combination used when mode = "gesture". Two bare modifiers work

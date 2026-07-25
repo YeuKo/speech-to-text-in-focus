@@ -47,15 +47,44 @@ _SOUND_TEXT = {
 }
 
 
-def _build_html(cfg: "Config") -> str:
+def _how_to_dictate(cfg: "Config") -> str:
+    """The dictation instructions for the shortcut mode actually in use."""
+    if cfg.hotkey.mode == "gesture":
+        combo = html.escape(cfg.hotkey.gesture)
+        return f"""<table>
+  <tr><th>Gesture</th><th>What happens</th></tr>
+  <tr><td><b>Hold</b> <kbd>{combo}</kbd></td>
+      <td>Recording starts the moment you press it. Speak, and release when you
+          are done: the text is pasted where your cursor is.</td></tr>
+  <tr><td><b>Tap twice</b> <kbd>{combo}</kbd></td>
+      <td>Hands-free: it keeps recording after you let go, however long you take.
+          Press once more to finish.</td></tr>
+</table>
+<p>One combination, and the gesture picks the mode — nothing to decide before you
+start talking. Change it in tray → <b>Change shortcut</b>.</p>"""
+
     toggle = html.escape(cfg.hotkey.toggle)
     ptt = html.escape(cfg.hotkey.push_to_talk)
+    return f"""<table>
+  <tr><th>Mode</th><th>Shortcut</th><th>How</th></tr>
+  <tr><td><b>Toggle</b></td><td><kbd>{toggle}</kbd></td>
+      <td>Press once to start, take your time, then press again to stop (or it
+          stops on silence if auto-stop is on). Then the text is pasted.</td></tr>
+  <tr><td><b>Push-to-talk</b></td><td><kbd>{ptt}</kbd></td>
+      <td>Hold while speaking, release to transcribe.</td></tr>
+</table>"""
+
+
+def _build_html(cfg: "Config") -> str:
     backend = html.escape(cfg.engine.backend)
     auto_stop = "on" if cfg.audio.auto_stop else "off (manual)"
     sound = _SOUND_TEXT.get(cfg.feedback.sound, html.escape(cfg.feedback.sound))
     overlay = "on" if cfg.feedback.overlay else "off"
     n_terms = len(cfg.dictionary.terms)
     microphone = html.escape(describe_current(cfg.audio.input_device))
+    language = "detected automatically" if cfg.engine.language == "auto" else \
+        html.escape(cfg.engine.language)
+    how_to_dictate = _how_to_dictate(cfg)
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -84,18 +113,13 @@ def _build_html(cfg: "Config") -> str:
 browser, editor, chat, email.</p>
 
 <h2>How to dictate</h2>
-<table>
-  <tr><th>Mode</th><th>Shortcut</th><th>How</th></tr>
-  <tr>
-    <td><b>Toggle</b></td><td><kbd>{toggle}</kbd></td>
-    <td>Press once to start, take your time, then press again to stop
-        (or it stops on silence if auto-stop is on). Then the text is pasted.</td>
-  </tr>
-  <tr>
-    <td><b>Push-to-talk</b></td><td><kbd>{ptt}</kbd></td>
-    <td>Hold while speaking, release to transcribe.</td>
-  </tr>
-</table>
+{how_to_dictate}
+<p>Transcription happens <b>while you speak</b>, in chunks cut on your pauses, so
+when you finish only the last seconds are left to process — the text appears
+almost at once even after a long dictation.</p>
+<p>The language is currently <b>{language}</b>, changeable in tray →
+<b>Language</b>. Worth knowing: forcing the wrong one does not fail, it makes
+Whisper translate your words instead.</p>
 <h2>How you know what it is doing</h2>
 <p>The microphone in the tray turns <span style="color:#dc3c3c">red</span> while
 recording and <span style="color:#e0a528">orange</span> while transcribing; hover it
@@ -117,9 +141,9 @@ Windows keeps every one of them in the Action Center, which piles up fast.</div>
 <ul>
   <li><b>On</b> — recording stops automatically after a short pause. Best for
       quick dictation.</li>
-  <li><b>Off (manual)</b> — recording continues no matter how long you pause;
-      it only stops when you press <kbd>{toggle}</kbd> again. Best when you want
-      to think out loud without being cut off.</li>
+  <li><b>Off (manual)</b> — recording continues no matter how long you pause; it
+      stops when you say so, with the shortcut. Best when you want to think out
+      loud without being cut off. This is how it comes out of the box.</li>
 </ul>
 <div class="tip">Whatever you pick here is written to <code>config.toml</code>
 straight away, so it is still there next time you start.</div>
