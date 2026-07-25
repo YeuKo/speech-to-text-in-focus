@@ -35,6 +35,7 @@ _SOUND_LABELS: tuple[tuple[str, str], ...] = (
     ("off", "Silent"),
 )
 
+
 def _fmt_combo(combo: str) -> str:
     """Human-friendly label, e.g. 'ctrl+alt+space' -> 'Ctrl + Alt + Space'."""
     return " + ".join(part.capitalize() for part in combo.split("+"))
@@ -82,6 +83,7 @@ class TrayIcon:
         on_edit_terms: Callable[[], None],
         on_set_microphone: Callable[[str], None],
         current_microphone: Callable[[], str],
+        current_gesture: Callable[[], str],
     ) -> None:
         self._current_toggle = current_toggle
         self._current_ptt = current_ptt
@@ -102,6 +104,7 @@ class TrayIcon:
         self._on_edit_terms = on_edit_terms
         self._on_set_microphone = on_set_microphone
         self._current_microphone = current_microphone
+        self._current_gesture = current_gesture
         self._icon = None
         self._images = {state: _make_image(rgb) for state, rgb in _COLORS.items()}
 
@@ -131,6 +134,12 @@ class TrayIcon:
             pystray.MenuItem(
                 lambda item: f"Push-to-talk ({_fmt_combo(self._current_ptt())})…",
                 lambda icon, item: self._handle_set_hotkey("push_to_talk"),
+            ),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem(
+                lambda item: ("Hold / double-tap: "
+                              + (_fmt_combo(self._current_gesture()) or "off") + "…"),
+                lambda icon, item: self._handle_set_hotkey("gesture"),
             ),
         )
 

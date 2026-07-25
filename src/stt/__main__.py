@@ -325,7 +325,7 @@ def main(argv: list[str] | None = None) -> int:
     tray = None
     try:
         from stt import keystore
-        from stt.config_writer import persist_hotkey, persist_value
+        from stt.config_writer import persist_value
         from stt.ui.dialogs import ask_api_key, build_hotkey, edit_terms, message_box
         from stt.ui.help import open_config, open_instructions, open_usage_report
         from stt.ui.overlay import StatusOverlay
@@ -340,15 +340,18 @@ def main(argv: list[str] | None = None) -> int:
                 controller.suspend_hotkeys()
                 ok, msg = controller.apply_hotkey(which, combo)
                 if ok:
-                    persist_hotkey(config_path, which, combo)
+                    persist_value(config_path, "hotkey", which, combo)
                 else:
                     message_box("Could not set shortcut", msg, error=True)
                 done()
 
-            labels = {"toggle": "toggle dictation", "push_to_talk": "push-to-talk"}
-            current = cfg.hotkey.toggle if which == "toggle" else cfg.hotkey.push_to_talk
-            other = cfg.hotkey.push_to_talk if which == "toggle" else cfg.hotkey.toggle
-            build_hotkey(labels[which], current, other, _apply)
+            labels = {"toggle": "toggle dictation", "push_to_talk": "push-to-talk",
+                      "gesture": "hold / double-tap"}
+            current = getattr(cfg.hotkey, which)
+            taken = next((getattr(cfg.hotkey, n) for n in ("toggle", "push_to_talk", "gesture")
+                          if n != which and getattr(cfg.hotkey, n)), "")
+            build_hotkey(labels[which], current, taken, _apply,
+                         modifiers_only=which == "gesture")
 
         def _set_engine(name: str) -> None:
             if name == "openai" and not keystore.has_api_key():
@@ -424,6 +427,7 @@ def main(argv: list[str] | None = None) -> int:
             on_edit_terms=_edit_terms_dialog,
             on_set_microphone=_set_microphone,
             current_microphone=controller.current_microphone,
+            current_gesture=lambda: cfg.hotkey.gesture,
         )
         controller.set_on_state_change(tray.set_state)
         controller.set_on_notify(_user_event)

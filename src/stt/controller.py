@@ -172,13 +172,19 @@ class Controller:
         Assumes hotkeys are currently suspended; re-registers on the way out.
         Reverts and reports if the combination is invalid or already in use.
         """
-        if which not in ("toggle", "push_to_talk"):
+        if which not in ("toggle", "push_to_talk", "gesture"):
             self.resume_hotkeys()
             return False, f"Unknown hotkey: {which}"
-        other = self._cfg.hotkey.push_to_talk if which == "toggle" else self._cfg.hotkey.toggle
-        if combo == other:
+
+        # An empty gesture is how you turn it off; the other two cannot be empty.
+        others = {
+            name: getattr(self._cfg.hotkey, name)
+            for name in ("toggle", "push_to_talk", "gesture")
+            if name != which
+        }
+        if combo and combo in others.values():
             self.resume_hotkeys()
-            return False, "That combination is already used by the other mode."
+            return False, "That combination is already used by another mode."
 
         previous = getattr(self._cfg.hotkey, which)
         setattr(self._cfg.hotkey, which, combo)

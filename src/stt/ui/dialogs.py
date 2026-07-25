@@ -289,6 +289,8 @@ def build_hotkey(
     current: str,
     taken: str,
     on_save: Callable[[str], None],
+    *,
+    modifiers_only: bool = False,
 ) -> None:
     """Compose a shortcut from tick boxes plus one key, and hand it to ``on_save``.
 
@@ -296,7 +298,12 @@ def build_hotkey(
     the global hotkeys and fighting the tray's modal loop, which was fragile.
     Picking the parts is just as flexible and cannot get stuck.
 
-    ``taken`` is the combination the other mode uses, rejected inline here.
+    ``taken`` is a combination already spoken for, rejected inline here.
+
+    With ``modifiers_only`` the final key becomes optional, so a combination of
+    bare modifiers like Ctrl+Win can be built — which is what the gesture
+    shortcut wants, since nothing types it by accident. Two modifiers are the
+    minimum in that case: one alone would fire constantly.
     """
 
     def _build(root) -> None:
@@ -349,16 +356,27 @@ def build_hotkey(
         def _combo() -> str:
             mods = [m for m, _ in _MODIFIERS if mod_vars[m].get()]
             key = _KEY_BY_LABEL.get(key_var.get(), "")
-            return "+".join([*mods, key]) if key else ""
+            return "+".join([*mods, key] if key else mods)
 
         def _refresh(*_args) -> None:
             mods = [m for m, _ in _MODIFIERS if mod_vars[m].get()]
             key = _KEY_BY_LABEL.get(key_var.get(), "")
             combo = _combo()
-            preview.config(text=" + ".join(
-                p.capitalize() for p in combo.split("+")) if combo else "—")
 
-            if not key:
+            # Always show what is ticked so far, with a trailing ellipsis while a
+            # key is still expected: a preview stuck on "—" reads as broken.
+            shown = " + ".join(p.capitalize() for p in combo.split("+")) if combo else "—"
+            if combo and not key and not modifiers_only:
+                shown += " + …"
+            preview.config(text=shown)
+
+            if not key and modifiers_only:
+                if len(mods) < 2:
+                    note.config(text="Tick at least two modifiers, or pick a key as "
+                                     "well.", fg="#7a1f1f")
+                    save_btn.config(state="disabled")
+                    return
+            elif not key:
                 note.config(text="Choose a key.", fg="#7a1f1f")
                 save_btn.config(state="disabled")
                 return

@@ -35,6 +35,7 @@ def _tray(on_quit, log):
         current_sound=lambda: "off", on_toggle_overlay=lambda: None,
         overlay_enabled=lambda: True, on_edit_terms=lambda: None,
         on_set_microphone=lambda n: None, current_microphone=lambda: "auto",
+        current_gesture=lambda: "",
     )
     tray._icon = FakeIcon(log)
     return tray
