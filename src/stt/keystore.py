@@ -11,7 +11,9 @@ import os
 
 log = logging.getLogger(__name__)
 
-SERVICE = "stt-dictation"
+SERVICE = "stt-dictation"   # kept stable across renames: it is the
+                            # key under which Windows already stores the
+                            # secret, and changing it would orphan it
 USERNAME = "openai_api_key"
 
 

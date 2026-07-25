@@ -1,4 +1,4 @@
-# STT Dictation
+# Speech to Text in Focus
 
 > Press a hotkey, speak, and your words are typed wherever your cursor is — in any Windows app.
 
@@ -38,14 +38,14 @@ private), with an optional **OpenAI API** backend for machines without a capable
 
 ### Download the release (no Python needed)
 
-1. Grab `stt-dictation-<version>-win64.zip` from the
+1. Grab `speech-to-text-in-focus-<version>-win64.zip` from the
    [releases page](https://github.com/YeuKo/speech-to-text-in-focus/releases) (~105 MB).
 2. Unzip it wherever you like — Documents, a USB stick, anywhere you can write.
 3. Run **`stt.exe`**. A microphone appears in the system tray.
 
 Everything the app writes (`config.toml`, `logs/`) stays inside that folder, so
 deleting it removes the app completely. If you unzip it somewhere read-only, such as
-Program Files, settings go to `%APPDATA%\stt-dictation` instead.
+Program Files, settings go to `%APPDATA%\speech-to-text-in-focus` instead.
 
 > **First run takes a few minutes.** The speech model (1.6 GB with a GPU, 464 MB on
 > CPU) is downloaded from Hugging Face and cached in `%USERPROFILE%\.cache\huggingface`;
@@ -223,7 +223,7 @@ ruff check src tests
 
 ```powershell
 pip install -e ".[windows,build]"
-python scripts/build.py       # -> dist\stt-dictation\ and the .zip beside it
+python scripts/build.py       # -> dist\speech-to-text-in-focus\ and the .zip beside it
 ```
 
 `packaging/stt.spec` documents the choices: a folder build rather than a single file

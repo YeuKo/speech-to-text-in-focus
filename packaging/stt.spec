@@ -69,5 +69,5 @@ coll = COLLECT(                       # noqa: F821
     a.datas,
     strip=False,
     upx=False,
-    name="stt-dictation",
+    name="speech-to-text-in-focus",
 )

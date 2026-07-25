@@ -1,3 +1,3 @@
-"""STT Dictation: voice dictation for Windows with local Whisper or the OpenAI API."""
+"""Speech to Text in Focus: voice dictation for Windows with local Whisper or the OpenAI API."""
 
 __version__ = "0.1.0"

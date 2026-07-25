@@ -38,7 +38,7 @@ jobs:
       # downloadable from the run.
       - uses: actions/upload-artifact@v4
         with:
-          name: stt-dictation-win64
+          name: speech-to-text-in-focus-win64
           path: dist/*.zip
           if-no-files-found: error
 

@@ -277,7 +277,7 @@ def main(argv: list[str] | None = None) -> int:
     data_dir = paths.anchor(cfg, resolved_config)
 
     logging_setup.setup(cfg.logging.level, cfg.logging.dir)
-    log.info("STT Dictation %s — backend=%s, language=%s",
+    log.info("Speech to Text in Focus %s — backend=%s, language=%s",
              __version__, cfg.engine.backend, cfg.engine.language)
     log.info("Config: %s | data: %s", resolved_config or "defaults", data_dir)
 
@@ -423,7 +423,7 @@ def main(argv: list[str] | None = None) -> int:
                 try:
                     from stt.ui.dialogs import message_box
 
-                    message_box("STT Dictation", controller.startup_warning)
+                    message_box("Speech to Text in Focus", controller.startup_warning)
                 except Exception:
                     pass
             tray.run()  # blocks until "Quit" is chosen

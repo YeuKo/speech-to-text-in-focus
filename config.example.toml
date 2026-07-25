@@ -1,4 +1,4 @@
-# STT Dictation configuration.
+# Speech to Text in Focus configuration.
 # Copy this file to "config.toml" and adjust it. config.toml is in .gitignore.
 
 [engine]

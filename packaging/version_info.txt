@@ -17,12 +17,12 @@ VSVersionInfo(
         "040904B0",
         [
           StringStruct("CompanyName", "YeuKo"),
-          StringStruct("FileDescription", "STT Dictation — voice dictation with Whisper"),
+          StringStruct("FileDescription", "Speech to Text in Focus — voice dictation with Whisper"),
           StringStruct("FileVersion", "0.1.0"),
           StringStruct("InternalName", "stt"),
           StringStruct("LegalCopyright", "MIT licensed"),
           StringStruct("OriginalFilename", "stt.exe"),
-          StringStruct("ProductName", "STT Dictation"),
+          StringStruct("ProductName", "Speech to Text in Focus"),
           StringStruct("ProductVersion", "0.1.0"),
         ],
       )

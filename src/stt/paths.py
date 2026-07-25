@@ -12,7 +12,7 @@ anything the app writes goes inside it. That folder is chosen once at startup:
 1. ``--config`` if given — the user is explicit, obey.
 2. ``config.toml`` next to the executable, so an unzipped portable copy keeps
    everything together and can be deleted in one go.
-3. ``%APPDATA%\\stt-dictation``, for when the executable's folder is read-only.
+3. ``%APPDATA%\\speech-to-text-in-focus``, for when the executable's folder is read-only.
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-APP_NAME = "stt-dictation"
+APP_NAME = "speech-to-text-in-focus"
 CONFIG_NAME = "config.toml"
 TEMPLATE_NAME = "config.example.toml"
 
@@ -60,7 +60,7 @@ def app_dir() -> Path:
 
 
 def user_data_dir() -> Path:
-    """``%APPDATA%\\stt-dictation``, or its equivalent off Windows."""
+    """``%APPDATA%\\speech-to-text-in-focus``, or its equivalent off Windows."""
     appdata = os.environ.get("APPDATA")
     base = Path(appdata) if appdata else Path.home() / ".config"
     return base / APP_NAME
@@ -111,7 +111,7 @@ def _create_from_template(destination: Path) -> Path | None:
         if template.exists():
             shutil.copy(template, destination)
         else:
-            destination.write_text("# STT Dictation configuration\n", encoding="utf-8")
+            destination.write_text("# Speech to Text in Focus configuration\n", encoding="utf-8")
         log.info("Created %s", destination)
         return destination
     except OSError as exc:

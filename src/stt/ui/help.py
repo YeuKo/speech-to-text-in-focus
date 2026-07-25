@@ -60,7 +60,7 @@ def _build_html(cfg: "Config") -> str:
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>STT Dictation — Instructions</title>
+<title>Speech to Text in Focus — Instructions</title>
 <style>
   body {{ font-family: Segoe UI, system-ui, sans-serif; max-width: 760px;
          margin: 40px auto; padding: 0 20px; color: #1c2230; line-height: 1.55; }}
@@ -77,7 +77,7 @@ def _build_html(cfg: "Config") -> str:
 </style>
 </head>
 <body>
-<h1>🎙️ STT Dictation</h1>
+<h1>🎙️ Speech to Text in Focus</h1>
 <p class="pill">Backend: {backend} &nbsp;•&nbsp; Auto-stop: {auto_stop}</p>
 
 <p>Speak and have your words typed wherever your cursor is. Works in any app:
@@ -266,7 +266,7 @@ def _build_usage_html(cfg: "Config") -> str:
 
     return (
         '<!doctype html><html lang="en"><head><meta charset="utf-8">'
-        f"<title>STT Dictation — Usage &amp; Cost</title><style>{style}</style></head>"
+        f"<title>Speech to Text in Focus — Usage &amp; Cost</title><style>{style}</style></head>"
         f"<body><h1>💸 Usage &amp; Cost</h1>{body}</body></html>"
     )
 
