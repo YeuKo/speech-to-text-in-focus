@@ -30,21 +30,22 @@ api_key_env = "OPENAI_API_KEY"
 trim_silence = true
 
 [hotkey]
-# Separate global shortcuts per mode. Syntax of the "keyboard" library.
-# The tray menu ("Change shortcut") offers a list of ready-made combinations,
-# including ctrl+shift+z and ctrl+shift+x for either mode.
-toggle = "ctrl+alt+space"      # press to start / stop (or auto-stop on silence)
-push_to_talk = "ctrl+alt+v"    # hold while speaking
-# Default mode for a generic activation: "toggle" or "push_to_talk".
-default_mode = "toggle"
-# One combination for both modes, told apart by how you press it: hold it down to
-# talk, tap it twice for hands-free. Recording starts on the first press either
-# way, so nothing is clipped. Empty uses only the two shortcuts above.
-# Two bare modifiers work well ("ctrl+windows"): nothing types them by accident.
-gesture = ""
+# How dictation is triggered. Only the chosen mode's shortcuts are registered, so
+# there is never a spare combination doing something unexpected.
+#   "gesture"  -> ONE shortcut: hold it to talk, tap it twice for hands-free
+#   "separate" -> TWO shortcuts, one per mode
+# Changeable from the tray menu → Change shortcut.
+mode = "separate"
+# Used when mode = "gesture". Two bare modifiers work well here: nothing types
+# them by accident. Recording starts on the first press either way, so the
+# beginning of a sentence is never clipped.
+gesture = "ctrl+windows"
 # Held longer than this it is push-to-talk; shorter, it waits for a second tap.
 gesture_hold_ms = 250
 gesture_double_ms = 350
+# Used when mode = "separate". Syntax of the "keyboard" library.
+toggle = "ctrl+alt+space"      # press to start / stop (or auto-stop on silence)
+push_to_talk = "ctrl+alt+v"    # hold while speaking
 
 [feedback]
 # How the app reports what it is doing. Also changeable from the tray menu

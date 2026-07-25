@@ -381,6 +381,13 @@ def main(argv: list[str] | None = None) -> int:
             if cfg.feedback.overlay:
                 overlay.show(kind, title)
 
+        def _set_mode(mode: str) -> None:
+            ok, msg = controller.set_shortcut_mode(mode)
+            if ok:
+                persist_value(config_path, "hotkey", "mode", mode)
+            else:
+                message_box("Could not switch shortcut mode", msg, error=True)
+
         def _set_microphone(name: str) -> None:
             controller.set_microphone(name)   # picked up by the next recording
             persist_value(config_path, "audio", "input_device", name)
@@ -428,6 +435,8 @@ def main(argv: list[str] | None = None) -> int:
             on_set_microphone=_set_microphone,
             current_microphone=controller.current_microphone,
             current_gesture=lambda: cfg.hotkey.gesture,
+            current_mode=controller.shortcut_mode,
+            on_set_mode=_set_mode,
         )
         controller.set_on_state_change(tray.set_state)
         controller.set_on_notify(_user_event)

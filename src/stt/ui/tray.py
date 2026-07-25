@@ -84,6 +84,8 @@ class TrayIcon:
         on_set_microphone: Callable[[str], None],
         current_microphone: Callable[[], str],
         current_gesture: Callable[[], str],
+        current_mode: Callable[[], str],
+        on_set_mode: Callable[[str], None],
     ) -> None:
         self._current_toggle = current_toggle
         self._current_ptt = current_ptt
@@ -105,6 +107,8 @@ class TrayIcon:
         self._on_set_microphone = on_set_microphone
         self._current_microphone = current_microphone
         self._current_gesture = current_gesture
+        self._current_mode = current_mode
+        self._on_set_mode = on_set_mode
         self._icon = None
         self._images = {state: _make_image(rgb) for state, rgb in _COLORS.items()}
 
@@ -126,20 +130,37 @@ class TrayIcon:
             ),
         )
 
+        # One place for everything about triggering dictation: the mode on top,
+        # and below it only the combinations that mode actually uses.
+        def _in_mode(name: str):
+            return lambda item: self._current_mode() == name
+
         shortcuts_menu = pystray.Menu(
             pystray.MenuItem(
-                lambda item: f"Toggle dictation ({_fmt_combo(self._current_toggle())})…",
-                lambda icon, item: self._handle_set_hotkey("toggle"),
+                "One shortcut: hold to talk, tap twice for hands-free",
+                lambda icon, item: self._handle_set_mode("gesture"),
+                checked=_in_mode("gesture"), radio=True,
             ),
             pystray.MenuItem(
-                lambda item: f"Push-to-talk ({_fmt_combo(self._current_ptt())})…",
-                lambda icon, item: self._handle_set_hotkey("push_to_talk"),
+                "Two shortcuts: one to toggle, one to hold",
+                lambda icon, item: self._handle_set_mode("separate"),
+                checked=_in_mode("separate"), radio=True,
             ),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
-                lambda item: ("Hold / double-tap: "
-                              + (_fmt_combo(self._current_gesture()) or "off") + "…"),
+                lambda item: f"Shortcut: {_fmt_combo(self._current_gesture())}…",
                 lambda icon, item: self._handle_set_hotkey("gesture"),
+                visible=_in_mode("gesture"),
+            ),
+            pystray.MenuItem(
+                lambda item: f"Toggle dictation: {_fmt_combo(self._current_toggle())}…",
+                lambda icon, item: self._handle_set_hotkey("toggle"),
+                visible=_in_mode("separate"),
+            ),
+            pystray.MenuItem(
+                lambda item: f"Push-to-talk: {_fmt_combo(self._current_ptt())}…",
+                lambda icon, item: self._handle_set_hotkey("push_to_talk"),
+                visible=_in_mode("separate"),
             ),
         )
 
@@ -154,10 +175,7 @@ class TrayIcon:
         )
 
         menu = pystray.Menu(
-            pystray.MenuItem(lambda item: f"Toggle dictation: {_fmt_combo(self._current_toggle())}",
-                             None, enabled=False),
-            pystray.MenuItem(lambda item: f"Push-to-talk: {_fmt_combo(self._current_ptt())}",
-                             None, enabled=False),
+            pystray.MenuItem(lambda item: self._shortcut_summary(), None, enabled=False),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
                 "Auto-stop on silence",
@@ -183,6 +201,14 @@ class TrayIcon:
             title=self._tooltip("idle"),
             menu=menu,
         )
+
+    def _shortcut_summary(self) -> str:
+        """The line at the top of the menu: how to dictate, right now."""
+        if self._current_mode() == "gesture":
+            combo = _fmt_combo(self._current_gesture())
+            return f"Hold {combo} to talk · tap twice for hands-free"
+        return (f"Toggle: {_fmt_combo(self._current_toggle())} · "
+                f"Hold: {_fmt_combo(self._current_ptt())}")
 
     def _microphone_menu(self):
         """Radio list of the available microphones, built once at startup.
@@ -286,6 +312,13 @@ class TrayIcon:
             self._on_set_api_key()
         except Exception:
             log.exception("Error saving the API key.")
+
+    def _handle_set_mode(self, mode: str) -> None:
+        try:
+            self._on_set_mode(mode)
+        except Exception:
+            log.exception("Error switching shortcut mode.")
+        self.refresh()
 
     def _handle_set_hotkey(self, which: str) -> None:
         """Open the shortcut builder for one mode. The menu refreshes when it saves."""

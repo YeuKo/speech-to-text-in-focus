@@ -21,7 +21,7 @@ log = logging.getLogger(__name__)
 BACKENDS = ("local", "openai")
 DEVICES = ("auto", "cuda", "cpu")
 COMPUTE_TYPES = ("auto", "int8", "int8_float16", "float16", "float32")
-HOTKEY_MODES = ("toggle", "push_to_talk")
+SHORTCUT_MODES = ("separate", "gesture")
 INJECTION_METHODS = ("clipboard", "type")
 SOUND_MODES = ("system", "beeps", "off")
 OVERLAY_POSITIONS = ("bottom-right", "bottom-left", "top-right", "top-left")
@@ -42,6 +42,9 @@ RETIRED_KEYS: dict[str, tuple[str, ...]] = {
     # Native tray balloons: replaced by the floating status pill because Windows
     # keeps every balloon in the Action Center.
     "feedback": ("notifications",),
+    # default_mode was only ever validated, never read: the mode is now chosen by
+    # hotkey.mode, which actually decides what gets registered.
+    "hotkey": ("default_mode",),
 }
 
 
@@ -77,14 +80,17 @@ class OpenAIConfig:
 
 @dataclass
 class HotkeyConfig:
+    # How dictation is triggered:
+    #   "separate" -> two shortcuts, one per mode (toggle and push-to-talk)
+    #   "gesture"  -> one shortcut for both: hold it to talk, tap it twice for
+    #                 hands-free. Only the chosen mode's shortcuts are registered,
+    #                 so there is never a second combination doing something else.
+    mode: str = "separate"
     toggle: str = "ctrl+alt+space"
     push_to_talk: str = "ctrl+alt+v"
-    default_mode: str = "toggle"
-    # One combination for both modes, told apart by the gesture: hold it to talk,
-    # tap it twice for hands-free. Empty disables it and only the two separate
-    # shortcuts above are used. Two modifiers on their own ("ctrl+windows") work
-    # well here — nothing types them by accident.
-    gesture: str = ""
+    # The single combination used when mode = "gesture". Two bare modifiers work
+    # well ("ctrl+windows"): nothing types them by accident.
+    gesture: str = "ctrl+windows"
     # Held for longer than this, it is push-to-talk; shorter, it waits to see if a
     # second tap arrives.
     gesture_hold_ms: int = 250
@@ -288,7 +294,9 @@ def _validate(cfg: Config) -> None:
     _one_of(cfg.engine.backend, BACKENDS, "engine.backend")
     _one_of(cfg.local.device, DEVICES, "local.device")
     _one_of(cfg.local.compute_type, COMPUTE_TYPES, "local.compute_type")
-    _one_of(cfg.hotkey.default_mode, HOTKEY_MODES, "hotkey.default_mode")
+    _one_of(cfg.hotkey.mode, SHORTCUT_MODES, "hotkey.mode")
+    if cfg.hotkey.mode == "gesture" and not cfg.hotkey.gesture:
+        raise ConfigError('hotkey.gesture cannot be empty when mode = "gesture".')
     _one_of(cfg.feedback.sound, SOUND_MODES, "feedback.sound")
     _one_of(cfg.feedback.overlay_position, OVERLAY_POSITIONS, "feedback.overlay_position")
     _one_of(cfg.injection.method, INJECTION_METHODS, "injection.method")

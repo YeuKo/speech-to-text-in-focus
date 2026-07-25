@@ -63,6 +63,29 @@ class TestRenamedKeys:
             config.from_dict({"audio": {"use_vad": "yes"}})
 
 
+class TestShortcutMode:
+    def test_defaults_to_two_shortcuts(self):
+        assert config.from_dict({}).hotkey.mode == "separate"
+
+    @pytest.mark.parametrize("mode", config.SHORTCUT_MODES)
+    def test_accepts_both_modes(self, mode):
+        assert config.from_dict({"hotkey": {"mode": mode}}).hotkey.mode == mode
+
+    def test_rejects_an_unknown_mode(self):
+        with pytest.raises(config.ConfigError, match="hotkey.mode"):
+            config.from_dict({"hotkey": {"mode": "voice"}})
+
+    def test_gesture_mode_needs_a_combination(self):
+        """Otherwise the app would start with no way at all to dictate."""
+        with pytest.raises(config.ConfigError, match="gesture cannot be empty"):
+            config.from_dict({"hotkey": {"mode": "gesture", "gesture": ""}})
+
+    def test_the_dead_default_mode_key_is_ignored(self, caplog):
+        cfg = config.from_dict({"hotkey": {"default_mode": "toggle"}})
+        assert not hasattr(cfg.hotkey, "default_mode")
+        assert "default_mode" in caplog.text
+
+
 class TestRetiredKeys:
     def test_a_removed_setting_does_not_stop_the_app(self, caplog):
         """A config.toml written by an older version must still load."""

@@ -155,6 +155,27 @@ class Controller:
     def is_auto_stop(self) -> bool:
         return self._cfg.audio.auto_stop
 
+    # --- Shortcuts ----------------------------------------------------------
+
+    def shortcut_mode(self) -> str:
+        return self._cfg.hotkey.mode
+
+    def set_shortcut_mode(self, mode: str) -> tuple[bool, str]:
+        """Switch between the two shortcuts and the single gesture."""
+        if mode == self._cfg.hotkey.mode:
+            return True, f"Already using {mode}."
+        previous = self._cfg.hotkey.mode
+        self.suspend_hotkeys()
+        self._cfg.hotkey.mode = mode
+        try:
+            self.resume_hotkeys()
+        except Exception as exc:
+            self._cfg.hotkey.mode = previous
+            self.resume_hotkeys()
+            return False, f"Could not switch to {mode}: {exc}"
+        log.info("Shortcut mode: %s", mode)
+        return True, f"Shortcut mode: {mode}."
+
     # --- Hotkey reconfiguration (for the tray's capture dialog) -------------
 
     def suspend_hotkeys(self) -> None:
