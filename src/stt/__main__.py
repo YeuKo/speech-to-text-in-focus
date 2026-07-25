@@ -423,7 +423,9 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 return
             ok, msg = controller.switch_backend(name)
-            if not ok:
+            if ok:
+                persist_value(config_path, "engine", "backend", name)
+            else:
                 message_box("Could not switch engine", msg, error=True)
 
         def _set_sound(mode: str) -> None:
@@ -441,6 +443,11 @@ def main(argv: list[str] | None = None) -> int:
             """Single sink for pipeline events; each channel opts in separately."""
             if cfg.feedback.overlay:
                 overlay.show(kind, title)
+
+        def _toggle_auto_stop() -> None:
+            enabled = not controller.is_auto_stop()
+            controller.set_auto_stop(enabled)
+            persist_value(config_path, "audio", "auto_stop", enabled)
 
         def _set_mode(mode: str) -> None:
             ok, msg = controller.set_shortcut_mode(mode)
@@ -481,7 +488,7 @@ def main(argv: list[str] | None = None) -> int:
             on_set_hotkey=_set_hotkey,
             on_quit=lambda: (controller.stop(), overlay.stop()),
             on_help=lambda: open_instructions(cfg),
-            on_toggle_auto_stop=lambda: controller.set_auto_stop(not controller.is_auto_stop()),
+            on_toggle_auto_stop=_toggle_auto_stop,
             is_auto_stop=controller.is_auto_stop,
             on_open_config=lambda: open_config(config_path, _template),
             on_open_usage=lambda: open_usage_report(cfg),

@@ -121,9 +121,8 @@ Windows keeps every one of them in the Action Center, which piles up fast.</div>
       it only stops when you press <kbd>{toggle}</kbd> again. Best when you want
       to think out loud without being cut off.</li>
 </ul>
-<div class="tip">This toggle applies to the current session. To set the default
-permanently, edit <code>auto_stop</code> under <code>[audio]</code> in
-<code>config.toml</code>.</div>
+<div class="tip">Whatever you pick here is written to <code>config.toml</code>
+straight away, so it is still there next time you start.</div>
 
 <h2>Custom words (client and product names)</h2>
 <p>Tray → <b>Custom words…</b> opens a list, one name per line. They are sent to
