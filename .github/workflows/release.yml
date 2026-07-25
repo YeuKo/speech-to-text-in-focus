@@ -26,10 +26,10 @@ jobs:
           cache: pip
 
       - name: Install the app and the build tools
-        run: pip install -e ".[windows,build]"
+        run: pip install -e ".[windows,build,dev]"
 
       - name: Run the tests
-        run: pytest -q
+        run: python -m pytest -q
 
       - name: Build
         run: python scripts/build.py
