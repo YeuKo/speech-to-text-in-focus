@@ -5,7 +5,10 @@
 # Transcription backend: "local" (faster-whisper) or "openai" (API).
 backend = "local"
 # Audio language as ISO-639-1 ("en", "es", ...) or "auto" to autodetect.
-language = "auto"
+# Changeable from the tray menu -> Language. Naming it beats autodetection: a
+# short or noisy opening can make Whisper guess wrong and transcribe into
+# another language.
+language = "es"
 
 [local]
 # faster-whisper model. "auto" picks one based on the detected hardware:

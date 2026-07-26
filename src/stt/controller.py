@@ -365,7 +365,7 @@ class Controller:
                 "Could not open the microphone — see logs/stt.log.",
             )
             return
-        log.info("Recording... (press %s to stop or wait for silence)", self._cfg.hotkey.toggle)
+        log.info("Recording...%s", " (auto-stops on silence)" if self._cfg.audio.auto_stop else "")
         self._notify_user("recording", "Recording", "Speak now — I'm listening.")
 
     def _end_recording(self) -> None:

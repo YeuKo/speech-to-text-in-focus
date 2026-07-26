@@ -394,13 +394,19 @@ class TrayIcon:
         self._icon.title = self._tooltip(state)
 
     def _tooltip(self, state: str) -> str:
-        """Hover text: the state plus what to press next (silent feedback)."""
+        """Hover text: the state plus what to press next (silent feedback).
+
+        Follows the shortcut that is actually registered. Naming the toggle while
+        the gesture is the live one is worse than saying nothing: it is the first
+        thing a user checks when a shortcut seems not to work.
+        """
         label = _LABELS.get(state, state)
-        combo = _fmt_combo(self._current_toggle())
+        gesture = self._current_mode() == "gesture"
+        combo = _fmt_combo(self._current_gesture() if gesture else self._current_toggle())
         if state == "idle":
-            return f"STT — {label} · press {combo} to dictate"
+            return f"STT — {label} · {'hold' if gesture else 'press'} {combo} to dictate"
         if state == "recording":
-            return f"STT — {label} · press {combo} to stop"
+            return f"STT — {label} · {'release' if gesture else 'press'} {combo} to stop"
         return f"STT — {label}"
 
     def run(self) -> None:

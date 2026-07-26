@@ -519,7 +519,9 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         controller.start()
-        log.info("Ready. Toggle=%s | Push-to-talk=%s.", cfg.hotkey.toggle, cfg.hotkey.push_to_talk)
+        # The shortcuts themselves are reported by HotkeyManager.start(), which is
+        # the only place that knows which mode actually got registered.
+        log.info("Ready.")
         if tray is not None:
             log.info("Tray icon active. Use 'Quit' in the menu to exit.")
             if controller.startup_warning:

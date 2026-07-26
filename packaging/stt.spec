@@ -16,8 +16,17 @@
 
 from pathlib import Path
 
+from PyInstaller.utils.hooks import collect_data_files
+
 REPO = Path(SPECPATH).parent          # noqa: F821  (SPECPATH is injected)
 VERSION_FILE = REPO / "packaging" / "version_info.txt"
+
+# faster-whisper ships the silence detector as a data file (assets/silero_vad_*.onnx)
+# and loads it by path at runtime, so the import graph never sees it. Without this
+# the build starts fine and then fails on the first transcription with
+# "NO_SUCHFILE ... silero_vad_v6.onnx". Collected by name rather than listed
+# explicitly because the file is renamed on every VAD version bump.
+FASTER_WHISPER_DATA = collect_data_files("faster_whisper")
 
 a = Analysis(
     [str(REPO / "src" / "stt" / "__main__.py")],
@@ -29,7 +38,7 @@ a = Analysis(
         (str(REPO / "assets" / "stt.ico"), "assets"),
         (str(REPO / "README.md"), "."),
         (str(REPO / "LICENSE"), "."),
-    ],
+    ] + FASTER_WHISPER_DATA,
     hiddenimports=[
         # Chosen at runtime by keyring, so the import graph cannot see them.
         "keyring.backends.Windows",

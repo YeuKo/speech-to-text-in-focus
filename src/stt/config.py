@@ -60,7 +60,10 @@ class ConfigError(ValueError):
 @dataclass
 class EngineConfig:
     backend: str = "local"
-    language: str = "auto"  # ISO-639-1 (e.g. "en", "es") or "auto" to autodetect
+    # ISO-639-1 (e.g. "en", "es") or "auto" to autodetect. Naming the language
+    # beats autodetection: Whisper guesses from the first seconds of audio, and a
+    # short or noisy opening makes it transcribe into the wrong language outright.
+    language: str = "es"
 
 
 @dataclass
