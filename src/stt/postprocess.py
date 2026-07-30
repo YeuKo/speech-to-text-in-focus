@@ -1,13 +1,16 @@
 """Transcription post-processing: custom vocabulary and replacements.
 
 Pure logic (no Windows or model dependencies), which makes it the easiest part
-to test. Two mechanisms:
+to test. Three mechanisms:
 
 1. ``build_prompt``: builds the ``initial_prompt`` passed to Whisper to bias
-   recognition towards the proper nouns in the dictionary.
+   recognition towards the proper nouns in the dictionary. ``with_context``
+   extends it with what was said moments ago, so a chunk is not decoded blind.
 2. ``apply``: applies replacements on the already-transcribed text. By default
    exact whole-word matching (case-insensitive). If ``rapidfuzz`` is installed,
    ``apply_fuzzy`` adds correction by phonetic similarity.
+3. ``is_prompt_echo`` / ``is_context_echo`` / ``collapse_repeats``: drop the text
+   Whisper invents when there is nothing to transcribe.
 """
 
 from __future__ import annotations
@@ -33,6 +36,17 @@ _FUZZY_MIN_LEN = 5
 # Longest repeating cycle collapse_repeats looks for, in sentences.
 _MAX_CYCLE = 3
 
+# Whisper keeps only the *last* ~224 tokens of the initial prompt and silently
+# drops the rest, so an unbounded context would push the vocabulary — which goes
+# first — out of the prompt entirely. Budgeted in characters (Spanish runs about
+# three per token) with room to spare.
+_PROMPT_MAX_CHARS = 600
+
+# Shortest run of words is_context_echo will call an echo. Five words repeated
+# verbatim are almost certainly the model reciting its prompt back; two are
+# something a person plausibly said twice.
+_ECHO_MIN_WORDS = 5
+
 
 def build_prompt(terms: Iterable[str]) -> str | None:
     """Build the biasing prompt from the dictionary terms.
@@ -44,6 +58,74 @@ def build_prompt(terms: Iterable[str]) -> str | None:
     if not cleaned:
         return None
     return "Vocabulary: " + ", ".join(cleaned) + "."
+
+
+def with_context(prompt: str | None, context: str) -> str | None:
+    """Extend the biasing prompt with what was just transcribed.
+
+    Chunks are decoded one at a time and independently, so by default the model
+    starts each one knowing nothing about the sentence it is in the middle of.
+    Whisper's ``initial_prompt`` is precisely the channel for that context: text
+    that precedes the audio and conditions the decoding. Feeding it the tail of
+    the dictation is what keeps a sentence whole across a cut.
+
+    The context is trimmed to what fits alongside the vocabulary, keeping the
+    most recent part and starting it on a sentence boundary where possible.
+    """
+    context = context.strip()
+    if not context:
+        return prompt
+
+    prefix = f"{prompt} " if prompt else ""
+    budget = _PROMPT_MAX_CHARS - len(prefix)
+    if budget <= 0:                                # a vocabulary that long is already
+        return prompt                              # more than the prompt can hold
+
+    tail = _tail(context, budget)
+    return prefix + tail if tail else prompt
+
+
+def _tail(text: str, budget: int) -> str:
+    """The last ``budget`` characters of ``text``, starting on a clean boundary.
+
+    Handing the model half a word is worse than handing it less context, so the
+    cut is moved forward to the start of a sentence — or of a word, when keeping
+    whole sentences would leave almost nothing.
+    """
+    if len(text) <= budget:
+        return text
+
+    cut = text[-budget:]
+    boundary = _SENTENCE_SPLIT.search(cut)
+    if boundary is not None and len(cut) - boundary.end() >= budget // 4:
+        return cut[boundary.end():]
+
+    space = cut.find(" ")
+    return cut[space + 1:] if space != -1 else cut
+
+
+def _words(text: str) -> list[str]:
+    """The words of ``text``, lowercased — punctuation and spacing dropped."""
+    return [w.lower() for w in _WORD_RE.findall(text)]
+
+
+def is_context_echo(text: str, context: str) -> bool:
+    """True if the transcription only repeats the context it was primed with.
+
+    Same failure as ``is_prompt_echo``, one step further: given little or no
+    speech, Whisper continues its prompt instead of transcribing, and now the
+    prompt carries the previous sentences. Left alone it would paste a sentence
+    the user already said.
+
+    Only fires when **everything** returned was already in the context and there
+    is a decent run of it: repeating a five-word phrase word for word is the
+    model reciting, while a short "sí, exacto" is a person agreeing twice.
+    """
+    words = _words(text)
+    if len(words) < _ECHO_MIN_WORDS:
+        return False
+    # Padded so the match cannot start or end mid-word ("ana" inside "banana").
+    return f" {' '.join(words)} " in f" {' '.join(_words(context))} "
 
 
 def is_prompt_echo(text: str, terms: Iterable[str]) -> bool:
@@ -58,7 +140,7 @@ def is_prompt_echo(text: str, terms: Iterable[str]) -> bool:
     and at least two distinct terms, so a legitimate one-word dictation
     ("Grafana") is never thrown away.
     """
-    words = [w.lower() for w in _WORD_RE.findall(text)]
+    words = _words(text)
     if not words:
         return False
 
@@ -223,4 +305,12 @@ def apply_fuzzy(
     return _WORD_RE.sub(_replace, text)
 
 
-__all__ = ["build_prompt", "is_prompt_echo", "collapse_repeats", "apply", "apply_fuzzy"]
+__all__ = [
+    "build_prompt",
+    "with_context",
+    "is_prompt_echo",
+    "is_context_echo",
+    "collapse_repeats",
+    "apply",
+    "apply_fuzzy",
+]

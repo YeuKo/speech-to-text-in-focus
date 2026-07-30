@@ -131,8 +131,15 @@ Measured on this project, with a 31‑second dictation on an NVIDIA GPU:
 | Transcribing everything at the end | 3.83 s |
 | Transcribing in chunks | **0.50 s** |
 
-Both produce the same text. Set `chunk_seconds = 0` under `[audio]` to go back to
-transcribing everything at the end.
+Chunking has a cost, though: each fragment is decoded on its own, and Whisper
+reads a short isolated fragment worse than it reads a whole dictation — the seams
+are where words go missing. To claw that back, every chunk is primed with the
+tail of what has already been transcribed, which is what carries a sentence
+across a cut. It costs neither time nor money; `chunk_context = false` under
+`[audio]` turns it off.
+
+Set `chunk_seconds = 0` under `[audio]` to go back to transcribing everything at
+the end.
 
 ## Local vs OpenAI
 

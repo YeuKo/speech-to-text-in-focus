@@ -96,11 +96,19 @@ auto_stop = false
 vad_filter = true
 # Transcribe as you speak, in chunks of about this many seconds, instead of
 # waiting until you finish. Cuts are made on a pause, never mid-word, so when you
-# release the shortcut only the last moments are left: measured on a 31-second
-# dictation, the wait drops from 3.8s to 0.5s. Set to 0 for the old behaviour.
-chunk_seconds = 6.0
+# release the shortcut only the last moments are left. Set to 0 for the old
+# behaviour.
+# Lower this and dictation feels snappier at the end but reads worse: Whisper
+# handles short isolated fragments poorly. 20 or less keeps a chunk inside the
+# single 30-second window Whisper decodes.
+chunk_seconds = 12.0
 # Cut anyway after this long without a pause, for when you talk non-stop.
 chunk_max_seconds = 20.0
+# Prime each chunk with the tail of what has been transcribed so far, instead of
+# decoding it as if the dictation began there. This is what carries a sentence
+# across a cut, and it costs neither time nor money. Turn it off if the model
+# ever starts repeating phrases it already wrote.
+chunk_context = true
 # Adaptive threshold: measure background noise and adjust the cut automatically.
 # Recommended: adapts on its own to any microphone and environment, no calibration.
 auto_threshold = true

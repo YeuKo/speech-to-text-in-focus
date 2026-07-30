@@ -52,6 +52,11 @@ class Controller:
         # Text of the chunks already transcribed while the user was still
         # talking. Only ever touched from the transcription worker.
         self._partials: list[str] = []
+        # The same text, as one string, to prime the next chunk with. Kept apart
+        # from _partials because it outlives them: the final tail is transcribed
+        # after they have been handed over for injection, and it needs the
+        # context just as much. Same single-worker rule applies.
+        self._context = ""
         self._recorder = Recorder(
             config.audio,
             on_auto_stop=self._on_auto_stop,
@@ -396,13 +401,22 @@ class Controller:
             audio = normalise_level(audio)
 
         lang = self._cfg.engine.language if self._cfg.engine.language != "auto" else None
+
+        # Prime the model with the tail of what has been said so far, so a chunk
+        # is not decoded as if the dictation started there.
+        prompt = self._prompt
+        context = self._context if self._cfg.audio.chunk_context else ""
+        if context:
+            prompt = postprocess.with_context(prompt, context)
+            log.debug("Priming prompt: %r", prompt)
+
         with self._backend_lock:
             backend = self._backend
         result = backend.transcribe(
             audio,
             sample_rate=self._cfg.audio.sample_rate,
             language=lang,
-            prompt=self._prompt,
+            prompt=prompt,
         )
         text = postprocess.collapse_repeats(result.text)
         text = postprocess.apply(text, self._cfg.dictionary.replacements)
@@ -416,6 +430,14 @@ class Controller:
             log.debug("Discarded text: %r", text)
             return ""
 
+        if context and prompt and postprocess.is_context_echo(text, prompt):
+            # Same hallucination, but priming with the previous chunks gives it
+            # a whole sentence to recite instead of the vocabulary list.
+            log.info("Discarded a chunk that only repeated what came before it.")
+            log.debug("Discarded text: %r", text)
+            return ""
+
+        self._context = f"{self._context} {text}".strip()
         log.info("Transcribed %.1fs of audio into %d chars in %.1fs.",
                  seconds, len(text), result.elapsed_s or 0)
         log.debug("Transcription text: %r", text)
@@ -461,6 +483,7 @@ class Controller:
             self._notify_user("error", "Transcription failed", "See logs/stt.log for details.")
         finally:
             self._partials.clear()
+            self._context = ""
             self._force_state(State.IDLE)
 
     def stop(self) -> None:

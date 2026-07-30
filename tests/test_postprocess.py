@@ -17,6 +17,80 @@ class TestBuildPrompt:
         assert postprocess.build_prompt(["  Grafana  "]) == "Vocabulary: Grafana."
 
 
+class TestWithContext:
+    PROMPT = "Vocabulary: Grafana."
+
+    def test_no_context_leaves_the_prompt_alone(self):
+        assert postprocess.with_context(self.PROMPT, "") == self.PROMPT
+        assert postprocess.with_context(self.PROMPT, "   \n ") == self.PROMPT
+
+    def test_context_is_appended(self):
+        assert postprocess.with_context(self.PROMPT, "Estaba diciendo que sí.") == (
+            "Vocabulary: Grafana. Estaba diciendo que sí."
+        )
+
+    def test_without_vocabulary_the_context_is_the_whole_prompt(self):
+        assert postprocess.with_context(None, "Estaba diciendo que sí.") == (
+            "Estaba diciendo que sí."
+        )
+
+    def test_long_context_is_trimmed_to_what_whisper_reads(self):
+        context = "Una frase cualquiera del dictado. " * 60
+        out = postprocess.with_context(self.PROMPT, context)
+        assert len(out) <= postprocess._PROMPT_MAX_CHARS
+        # The vocabulary survives, and it is the *end* of the dictation that is kept.
+        assert out.startswith(self.PROMPT)
+        assert out.endswith("Una frase cualquiera del dictado.")
+
+    def test_trimming_starts_on_a_sentence_boundary(self):
+        context = "Frase número uno del dictado. " * 40 + "Y la última."
+        out = postprocess.with_context(None, context)
+        assert out.startswith("Frase número uno")
+
+    def test_unpunctuated_context_is_cut_between_words(self):
+        out = postprocess.with_context(None, "palabra " * 300)
+        assert out.startswith("palabra ")
+        assert len(out) <= postprocess._PROMPT_MAX_CHARS
+
+
+class TestIsContextEcho:
+    CONTEXT = "Vocabulary: Grafana. Lo que quería comentarte es que mañana no puedo."
+
+    def test_a_sentence_recited_back(self):
+        assert postprocess.is_context_echo(
+            "Lo que quería comentarte es que mañana no puedo.", self.CONTEXT
+        ) is True
+
+    def test_case_and_punctuation_do_not_matter(self):
+        assert postprocess.is_context_echo(
+            "lo que quería comentarte, es que mañana no puedo", self.CONTEXT
+        ) is True
+
+    def test_new_speech_is_kept(self):
+        assert postprocess.is_context_echo(
+            "Te llamo el jueves y lo vemos con calma.", self.CONTEXT
+        ) is False
+
+    def test_text_that_continues_the_context_is_kept(self):
+        """Only a *complete* repetition counts; carrying on is the normal case."""
+        assert postprocess.is_context_echo(
+            "es que mañana no puedo, así que lo dejamos para el jueves", self.CONTEXT
+        ) is False
+
+    def test_a_short_repetition_is_kept(self):
+        """People do say the same four words twice."""
+        assert postprocess.is_context_echo("mañana no puedo", self.CONTEXT) is False
+
+    def test_no_match_mid_word(self):
+        assert postprocess.is_context_echo(
+            "ana no puedo comentarte nada", "Mañana no puedo comentarte nada"
+        ) is False
+
+    def test_empty(self):
+        assert postprocess.is_context_echo("", self.CONTEXT) is False
+        assert postprocess.is_context_echo("Cualquier cosa que diga aquí", "") is False
+
+
 class TestIsPromptEcho:
     TERMS = ["Anthropic", "Kubernetes", "Grafana"]
 

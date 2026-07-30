@@ -113,10 +113,20 @@ class AudioConfig:
     # Transcribe while you speak, in chunks of roughly this many seconds, so that
     # releasing the shortcut leaves only the last moments to process. Chunks are
     # cut on a pause, never mid-word. 0 transcribes everything at the end.
-    chunk_seconds: float = 6.0
+    #
+    # Whisper is markedly worse on short isolated fragments, and the seams are
+    # where words go missing. Long enough to give the model something to work
+    # with on its own, still well inside the single 30-second window it decodes,
+    # so a chunk is never split across two.
+    chunk_seconds: float = 12.0
     # Cut anyway after this long without a pause, so talking non-stop still gets
     # the benefit.
     chunk_max_seconds: float = 20.0
+    # Prime each chunk with the tail of what has been transcribed so far, rather
+    # than decoding it as if the dictation began there. This is what carries the
+    # thread of a sentence across a cut, and it costs neither time nor money.
+    # Turn it off if the model ever starts repeating phrases it already wrote.
+    chunk_context: bool = True
     # Have Whisper skip the silent stretches of the recording. Unrelated to
     # auto_stop despite both being "VAD": this one guards against the model
     # inventing text over silence, so it stays on regardless.
