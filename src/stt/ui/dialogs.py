@@ -182,7 +182,8 @@ def ask_api_key(on_save: Callable[[str], None]) -> None:
 _TERMS_HELP = (
     "One name per line. These are passed to Whisper as context so it spells them\n"
     "the way you write them here — client names, people, products, jargon.\n"
-    "Keep the list short (a dozen or so): it is a hint, and a long list dilutes it."
+    "Keep the list short (a couple of dozen at most): it is a hint, not a rule, and\n"
+    "it shares a fixed budget with the running context of what you are dictating."
 )
 
 
@@ -192,21 +193,29 @@ def edit_terms(current: Sequence[str], on_save: Callable[[list[str]], None]) -> 
     def _build(root) -> None:
         import tkinter as tk
 
-        root.geometry("470x420")
-        root.minsize(380, 300)
+        root.minsize(380, 320)
 
         tk.Label(root, text=_TERMS_HELP, justify="left", anchor="w",
                  font=("Segoe UI", 9), fg="#444").pack(fill="x", padx=14, pady=(12, 8))
 
-        box = tk.Text(root, font=("Consolas", 11), undo=True,
+        # Buttons and status are packed *before* the text box and anchored to the
+        # bottom, so pack reserves their space first. Packed after it, they were
+        # the ones squeezed out of the window whenever the box asked for more
+        # room than the window had — which was always, since a tk.Text defaults
+        # to 24 lines. Nobody could reach Save.
+        buttons = tk.Frame(root)
+        buttons.pack(side="bottom", fill="x", padx=14, pady=12)
+        status = tk.Label(root, text="", font=("Segoe UI", 9), fg="#7a1f1f", anchor="w")
+        status.pack(side="bottom", fill="x", padx=14)
+
+        # Sized in lines and characters rather than pixels, so the window asks for
+        # what it actually needs at any display scaling.
+        box = tk.Text(root, height=12, width=38, font=("Consolas", 11), undo=True,
                       relief="solid", borderwidth=1)
         box.pack(fill="both", expand=True, padx=14)
         box.insert("1.0", "\n".join(current))
 
-        status = tk.Label(root, text="", font=("Segoe UI", 9), fg="#7a1f1f", anchor="w")
-        status.pack(fill="x", padx=14)
-
-        def _save() -> None:
+        def _save(*_args) -> None:
             terms = [line.strip() for line in box.get("1.0", "end").splitlines()]
             terms = [t for t in terms if t]
             # A quoted term would have to be escaped through TOML and adds
@@ -220,11 +229,13 @@ def edit_terms(current: Sequence[str], on_save: Callable[[list[str]], None]) -> 
             except Exception:
                 log.exception("Error saving the custom words.")
 
-        buttons = tk.Frame(root)
-        buttons.pack(fill="x", padx=14, pady=12)
         tk.Button(buttons, text="Save", width=12, command=_save).pack(side="right")
         tk.Button(buttons, text="Cancel", width=12,
                   command=root.destroy).pack(side="right", padx=(0, 8))
+        # Enter belongs to the text box (it is what starts a new term), so saving
+        # from the keyboard is Ctrl+Enter.
+        root.bind("<Control-Return>", _save)
+        root.bind("<Escape>", lambda _e: root.destroy())
         box.focus_set()
 
     _dialog("Custom words", _build, thread_name="stt-terms")
