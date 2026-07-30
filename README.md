@@ -23,7 +23,7 @@ private), with an optional **OpenAI API** backend for machines without a capable
   leaves only the last seconds: 0.5 s of wait on a 31‑second dictation instead of 3.8 s.
 - 🔇 **Adaptive silence detection** — auto‑stops on silence, adapting to any microphone; or fully manual.
 - 🎚️ **System tray UI** — a microphone icon that colour‑codes the state, plus engine switch, settings, help and usage in one menu.
-- 🔔 **Discreet feedback** — a floating status pill plus soft Windows cues, loud beeps or complete silence. No native notifications piling up in the Action Center.
+- 🔔 **Discreet feedback** — a floating status pill that shows the microphone as a live wave while you talk, plus soft Windows cues, loud beeps or complete silence. No native notifications piling up in the Action Center.
 - 💸 **Cost tracking** — for the API backend, estimates and logs the cost of each transcription.
 - 🔒 **Secure & private** — local‑first; the API key is stored in the OS credential store, never in files.
 - ⚡ **Auto hardware detection** — uses an NVIDIA GPU (CUDA 12.x) if available, otherwise CPU.

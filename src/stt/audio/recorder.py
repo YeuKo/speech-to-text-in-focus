@@ -28,6 +28,13 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 _WARMUP_S = 0.4          # don't cut during the first 0.4 s (avoids false positives)
+# Level at which the meter the UI draws reads full: twice the level of ordinary
+# speech, so conversational dictation lifts the bars well clear of the floor and
+# only a raised voice pins them at the top.
+_LEVEL_FULL_SCALE = SPEECH_LEVEL * 2
+# Applied to that ratio. Below 1 it stretches the quiet end of the range, which
+# is where speech actually sits: linear, a normal voice barely moves the meter.
+_LEVEL_CURVE = 0.4
 _NOISE_FACTOR = 3.5      # treat as speech above background_noise * this factor
 _MIN_FLOOR = 0.0010      # minimum noise floor (avoids a 0 threshold in dead silence)
 _FLOOR_RISE = 0.005      # how fast the noise estimate rises (slow)
@@ -53,10 +60,23 @@ class Recorder:
         self._started_at = 0.0
         self._noise_floor: float | None = None
         self._speech_detected = False
+        self._level = 0.0
 
     @property
     def is_recording(self) -> bool:
         return self._recording
+
+    @property
+    def level(self) -> float:
+        """How loud the microphone is right now, 0 to 1, for the UI to draw.
+
+        A plain float written by the audio callback and read by whoever is
+        drawing: no lock, no callback, no queue. The reader wants the latest
+        value and nothing else, and the audio callback must not be made to wait
+        on anyone — a missed or torn read is a frame drawn a hair stale, which
+        is invisible at thirty frames a second.
+        """
+        return self._level if self._recording else 0.0
 
     def start(self) -> None:
         import sounddevice as sd
@@ -70,6 +90,7 @@ class Recorder:
             self._last_speech_at = now
             self._noise_floor = None
             self._speech_detected = False
+            self._level = 0.0
 
         device = resolve_input_device(self._cfg.input_device)
         try:
@@ -138,6 +159,12 @@ class Recorder:
         now = time.monotonic()
         rms = float(np.sqrt(np.mean(indata ** 2)))
         threshold = self._threshold(rms)  # also updates the noise estimate during warmup
+
+        # Measured against the adaptive threshold, so a noisy room reads as quiet
+        # rather than as constant speech, and curved because loudness is perceived
+        # that way: on a linear scale a normal voice barely lifts the meter.
+        loud = max(0.0, rms - threshold)
+        self._level = min(1.0, (loud / _LEVEL_FULL_SCALE) ** _LEVEL_CURVE)
 
         # Hand over a finished chunk so it can be transcribed while the user is
         # still talking. Done before the auto-stop check because it applies

@@ -77,6 +77,10 @@ class Controller:
     def state(self) -> State:
         return self._state
 
+    def audio_level(self) -> float:
+        """How loud the microphone is right now, 0 to 1. Polled by the status pill."""
+        return self._recorder.level
+
     def set_on_state_change(self, callback: Callable[[str], None]) -> None:
         """Register a callback fired on every state change (e.g. the tray icon)."""
         self._on_state_change = callback

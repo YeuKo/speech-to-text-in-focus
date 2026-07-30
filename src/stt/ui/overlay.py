@@ -5,6 +5,12 @@ coloured by state, that goes away on its own. Unlike a Windows notification it
 leaves nothing behind in the Action Center, which is what makes it bearable dozens
 of times a day.
 
+While recording it draws a row of bars that follow the microphone, so a glance
+tells you not just *that* it is listening but that it is hearing **you** — a dead
+row of bars is a muted or wrong input device, which used to be invisible until
+the transcription came back empty. While transcribing the same bars run a wave of
+their own, since there is no longer anything to listen to.
+
 Tk is not thread-safe, so the window lives entirely on one dedicated thread: that
 thread creates it, runs its event loop and is the only one that touches it. Other
 threads just drop commands into a queue. Everything here is best-effort: if Tk is
@@ -15,8 +21,10 @@ from __future__ import annotations
 
 import gc
 import logging
+import math
 import queue
 import threading
+from collections.abc import Callable
 
 from stt.config import OVERLAY_POSITIONS
 from stt.ui import release_default_root
@@ -37,14 +45,45 @@ _DEFAULT_ACCENT = "#5a7ca8"
 _BG = "#1f232b"
 _FG = "#f2f4f8"
 
+# Kinds that draw the wave, and where its motion comes from.
+_LIVE = "recording"          # the microphone
+_WORKING = "transcribing"    # nothing to hear: a wave of its own
+
 # Kinds that describe a finished action: they hide themselves after a moment.
 # The others (recording, transcribing) stay until the next event replaces them.
 _AUTO_HIDE_MS: dict[str, int] = {
     "done": 1400, "empty": 1800, "error": 4000, "ready": 2500,
 }
 
-_POLL_MS = 60      # how often the Tk thread drains the command queue
+_FRAME_MS = 33     # ~30 fps while the pill is on screen
+_IDLE_MS = 80      # while hidden: often enough to pick up the next command
 _MARGIN = 16       # gap from the edge of the work area, in pixels
+
+_OPACITY = 0.96
+_FADE_IN = 0.22    # opacity added per frame while appearing
+_FADE_OUT = 0.12   # and removed per frame while leaving, slower: exits read best soft
+
+# The wave. Bars rather than a curve on purpose: Tk's canvas has no antialiasing,
+# so a sine line comes out as a staircase while rectangles are pixel-crisp.
+_BARS = 7
+_BAR_W = 3
+_BAR_GAP = 3
+_BAR_MIN_H = 3
+_BAR_MARGIN = 9              # clearance above and below the tallest bar
+_WAVE_W = _BARS * _BAR_W + (_BARS - 1) * _BAR_GAP
+_WAVE_GAP = 11               # between the wave and the text
+
+_PHASE_STEP = 0.42           # how fast the ripple travels
+_BAR_PHASE = 0.7             # phase offset between neighbouring bars
+_SMOOTHING = 0.35            # how quickly the drawn level chases the real one
+# How deep the ripple cuts. At 0 every bar is the same height and the wave is
+# gone; at 1 the trough flattens bars to nothing, and since the average bar then
+# only reaches half the measured level, the wave only reads when you raise your
+# voice. What is left over is the height every bar keeps regardless.
+_WAVE_DEPTH = 0.28
+
+_PAD = 13                    # inner margin, left of the wave and right of the text
+_ACCENT_W = 5                # the coloured edge
 
 _DEFAULT_POSITION = "bottom-right"   # next to the tray, where the state it reports lives
 
@@ -93,12 +132,20 @@ def _make_non_activating(root) -> None:
 class StatusOverlay:
     """Thread-safe handle to the pill. Starts its Tk thread on first use."""
 
-    def __init__(self, position: str = _DEFAULT_POSITION) -> None:
+    def __init__(
+        self,
+        position: str = _DEFAULT_POSITION,
+        level: Callable[[], float] | None = None,
+    ) -> None:
         self._commands: queue.Queue[tuple] = queue.Queue()
         self._thread: threading.Thread | None = None
         self._lock = threading.Lock()
         self._failed = False
         self._position = position if position in OVERLAY_POSITIONS else _DEFAULT_POSITION
+        # Polled once a frame from the Tk thread rather than pushed from the audio
+        # callback: the drawing side wants the latest value and nothing else, and
+        # the audio callback must never be made to wait on the UI.
+        self._level = level
 
     # --- public API (safe from any thread) ----------------------------------
 
@@ -115,6 +162,15 @@ class StatusOverlay:
 
     # --- internals ----------------------------------------------------------
 
+    def _read_level(self) -> float:
+        """The microphone level, clamped. Never raises: this runs every frame."""
+        if self._level is None:
+            return 0.0
+        try:
+            return max(0.0, min(1.0, float(self._level())))
+        except Exception:
+            return 0.0
+
     def _ensure_started(self) -> bool:
         """Start the Tk thread on first use. False if it is unusable."""
         with self._lock:
@@ -130,6 +186,7 @@ class StatusOverlay:
     def _run(self) -> None:
         try:
             import tkinter as tk
+            from tkinter import font as tkfont
         except Exception:
             self._failed = True
             log.warning("tkinter is unavailable: no floating status pill.", exc_info=True)
@@ -142,21 +199,44 @@ class StatusOverlay:
             log.warning("Could not create the status pill window.", exc_info=True)
             return
 
-        root.withdraw()
-        root.overrideredirect(True)   # no title bar, no taskbar button
-        root.attributes("-topmost", True)
-        root.attributes("-alpha", 0.95)
-        root.configure(bg=_DEFAULT_ACCENT)
+        try:
+            root.withdraw()
+            root.overrideredirect(True)   # no title bar, no taskbar button
+            root.attributes("-topmost", True)
+            root.attributes("-alpha", 0.0)
+            root.configure(bg=_BG)
 
-        label = tk.Label(
-            root, text="", bg=_BG, fg=_FG,
-            font=("Segoe UI", 11), padx=16, pady=9, anchor="w",
-        )
-        # The accent shows through as a thick left edge and a hairline border.
-        label.pack(fill="both", expand=True, padx=(6, 1), pady=1)
-        _make_non_activating(root)
+            text_font = tkfont.Font(family="Segoe UI", size=11)
+            # Measured from the font rather than fixed, so the pill keeps its
+            # proportions when Windows is scaling text at 125% or 150%.
+            height = text_font.metrics("linespace") + 20
 
-        state = {"hide_job": None, "transient": False}
+            canvas = tk.Canvas(root, bg=_BG, highlightthickness=0, bd=0, height=height)
+            canvas.pack(fill="both", expand=True)
+            _make_non_activating(root)
+        except Exception:
+            # Give up for good rather than let every event start another thread
+            # that dies the same way.
+            self._failed = True
+            log.warning("Could not build the status pill.", exc_info=True)
+            try:
+                root.destroy()
+                release_default_root(root)
+            except Exception:
+                pass
+            return
+
+        state = {
+            "hide_job": None,
+            "transient": False,
+            "visible": False,
+            "fading": "in",      # "in" or "out"
+            "opacity": 0.0,
+            "kind": "",
+            "phase": 0.0,
+            "level": 0.0,
+            "bars": [],
+        }
 
         def _cancel_hide() -> None:
             if state["hide_job"] is not None:
@@ -166,25 +246,100 @@ class StatusOverlay:
                     pass
                 state["hide_job"] = None
 
-        def _hide() -> None:
-            _cancel_hide()
-            state["transient"] = False
-            root.withdraw()
+        def _layout(kind: str, text: str) -> None:
+            """Redraw the pill for a new state and place it in its corner."""
+            accent = _ACCENTS.get(kind, _DEFAULT_ACCENT)
+            wave = kind in (_LIVE, _WORKING)
 
-        def _show(kind: str, text: str) -> None:
-            _cancel_hide()
-            root.configure(bg=_ACCENTS.get(kind, _DEFAULT_ACCENT))
-            label.config(text=text)
+            w = _ACCENT_W + _PAD + text_font.measure(text) + _PAD
+            if wave:
+                w += _WAVE_W + _WAVE_GAP
+
+            canvas.delete("all")
+            state["bars"] = []
+            canvas.config(width=w, height=height)
+            # The accent as a thick left edge and a hairline border, as before.
+            canvas.create_rectangle(0, 0, _ACCENT_W, height, fill=accent, width=0)
+            canvas.create_rectangle(0, 0, w - 1, height - 1, outline=accent, width=1)
+
+            x = _ACCENT_W + _PAD
+            if wave:
+                mid = height / 2
+                for i in range(_BARS):
+                    bx = x + i * (_BAR_W + _BAR_GAP)
+                    state["bars"].append(canvas.create_rectangle(
+                        bx, mid - _BAR_MIN_H / 2, bx + _BAR_W, mid + _BAR_MIN_H / 2,
+                        fill=accent, width=0,
+                    ))
+                x += _WAVE_W + _WAVE_GAP
+            canvas.create_text(x, height / 2, text=text, fill=_FG,
+                               font=text_font, anchor="w")
+
             # Size and place it while still hidden. Moving it after deiconify()
             # does not take: an overrideredirect window maps at +0+0 and keeps
             # that position, which is why the pill used to appear in the
             # top-left corner instead of by the tray.
             root.update_idletasks()
-            w, h = root.winfo_reqwidth(), root.winfo_reqheight()
             area = _work_area(root.winfo_screenwidth(), root.winfo_screenheight())
-            x, y = _corner(self._position, w, h, area)
-            root.geometry(f"{w}x{h}+{x}+{y}")
-            root.deiconify()
+            px, py = _corner(self._position, w, height, area)
+            root.geometry(f"{w}x{height}+{px}+{py}")
+
+        def _animate() -> None:
+            """One frame: fade the window, then move the bars."""
+            if state["fading"] == "in":
+                if state["opacity"] < _OPACITY:
+                    state["opacity"] = min(_OPACITY, state["opacity"] + _FADE_IN)
+                    root.attributes("-alpha", state["opacity"])
+            else:
+                state["opacity"] = max(0.0, state["opacity"] - _FADE_OUT)
+                root.attributes("-alpha", state["opacity"])
+                if state["opacity"] <= 0.0:
+                    state["visible"] = False
+                    state["level"] = 0.0
+                    root.withdraw()
+                    return
+
+            bars = state["bars"]
+            if not bars:
+                return
+
+            if state["kind"] == _LIVE:
+                target = self._read_level()
+            else:
+                # Transcribing: nothing to listen to, so the bars breathe on
+                # their own. A frozen row would read as a hung app.
+                target = 0.45 + 0.2 * math.sin(state["phase"] * 1.6)
+
+            state["level"] += (target - state["level"]) * _SMOOTHING
+            state["phase"] += _PHASE_STEP
+
+            mid = height / 2
+            span = height - 2 * _BAR_MARGIN - _BAR_MIN_H
+            for i, item in enumerate(bars):
+                # Each bar sits a little further along the wave than its
+                # neighbour: that offset is what reads as a travelling ripple
+                # rather than a row going up and down in unison.
+                envelope = (1.0 - _WAVE_DEPTH) + _WAVE_DEPTH * math.sin(
+                    state["phase"] + i * _BAR_PHASE)
+                bar_h = _BAR_MIN_H + span * state["level"] * envelope
+                x0, _, x1, _ = canvas.coords(item)
+                canvas.coords(item, x0, mid - bar_h / 2, x1, mid + bar_h / 2)
+
+        def _hide() -> None:
+            _cancel_hide()
+            state["transient"] = False
+            state["fading"] = "out"
+
+        def _show(kind: str, text: str) -> None:
+            _cancel_hide()
+            state["kind"] = kind
+            state["fading"] = "in"
+            _layout(kind, text)
+            if not state["visible"]:
+                state["opacity"] = 0.0
+                root.attributes("-alpha", 0.0)
+                root.deiconify()
+                state["visible"] = True
             root.attributes("-topmost", True)   # reassert: other windows may have jumped ahead
             log.debug("Status pill at %s (%s).", root.winfo_geometry(), self._position)
 
@@ -193,7 +348,7 @@ class StatusOverlay:
             if delay is not None:
                 state["hide_job"] = root.after(delay, _hide)
 
-        def _poll() -> None:
+        def _tick() -> None:
             stopping = False
             try:
                 while True:
@@ -214,9 +369,17 @@ class StatusOverlay:
             if stopping:
                 root.quit()
                 return
-            root.after(_POLL_MS, _poll)
 
-        root.after(_POLL_MS, _poll)
+            if state["visible"]:
+                try:
+                    _animate()
+                except Exception:
+                    # A dropped frame must never take the pill down with it.
+                    log.debug("Error animating the status pill.", exc_info=True)
+
+            root.after(_FRAME_MS if state["visible"] else _IDLE_MS, _tick)
+
+        root.after(_IDLE_MS, _tick)
         try:
             root.mainloop()
         except Exception:
@@ -233,7 +396,8 @@ class StatusOverlay:
             # would run on whichever thread triggers it, normally the main one at
             # exit, which Tcl aborts on. So drop the references and collect here.
             release_default_root(root)
-            root = label = None
+            root = canvas = text_font = None
+            state["bars"] = []
             gc.collect()
 
 

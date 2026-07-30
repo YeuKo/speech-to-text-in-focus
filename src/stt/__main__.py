@@ -392,7 +392,7 @@ def main(argv: list[str] | None = None) -> int:
         from stt.ui.overlay import StatusOverlay
         from stt.ui.tray import TrayIcon
 
-        overlay = StatusOverlay(cfg.feedback.overlay_position)
+        overlay = StatusOverlay(cfg.feedback.overlay_position, level=controller.audio_level)
         _template = paths.bundled_file(paths.TEMPLATE_NAME)
 
         def _set_hotkey(which: str, done: Callable[[], None]) -> None:
