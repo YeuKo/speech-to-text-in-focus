@@ -39,6 +39,17 @@ _MODIFIER_SCAN_CODES: dict[int, str] = {
     58: "caps lock",
 }
 
+# Virtual-key codes for the modifiers, to ask Windows whether a key really is
+# down. Two for "windows" because the left and right keys are separate keys with
+# one name. Only modifiers are listed: the gesture is made of modifiers, and they
+# are the ones whose release can go missing.
+_MODIFIER_VK: dict[str, tuple[int, ...]] = {
+    "ctrl": (0x11,),                # VK_CONTROL
+    "shift": (0x10,),               # VK_SHIFT
+    "alt": (0x12,),                 # VK_MENU
+    "windows": (0x5B, 0x5C),        # VK_LWIN, VK_RWIN
+}
+
 # Side markers, in the languages Windows is likely to be running in.
 _SIDES = ("left", "right", "izquierda", "derecha", "izq", "der",
           "gauche", "droite", "links", "rechts", "sinistra", "destra")
@@ -74,6 +85,26 @@ def canonical_key(name: str | None, scan_code: int | None = None) -> str:
             key = key[: -len(side) - 1]
             break
     return _KEY_ALIASES.get(key, key).strip()
+
+
+def _is_down(key: str) -> bool | None:
+    """Ask Windows whether ``key`` is physically down right now.
+
+    None when there is no answer to be had: a key that is not a modifier, or no
+    Win32 to ask. The caller then has to trust the events it saw.
+    """
+    codes = _MODIFIER_VK.get(key)
+    if codes is None:
+        return None
+    try:
+        import ctypes
+
+        user32 = ctypes.windll.user32
+        # GetAsyncKeyState's high bit is "down at this instant", unlike the low
+        # bit, which only says the key was pressed since the last call.
+        return any(user32.GetAsyncKeyState(vk) & 0x8000 for vk in codes)
+    except Exception:
+        return None
 
 
 class HotkeyManager:
@@ -115,6 +146,11 @@ class HotkeyManager:
 
     def start(self) -> None:
         import keyboard
+
+        # Nothing was being watched until now, so whatever the user was holding
+        # while the shortcuts were suspended is not ours to remember.
+        self._down.clear()
+        self._gesture_held = False
 
         if self._cfg.mode == "separate":
             keyboard.add_hotkey(self._cfg.toggle, _safe(self._on_toggle), suppress=False)
@@ -164,13 +200,45 @@ class HotkeyManager:
         else:
             self._down.discard(name)
 
+        # Whenever the record says the gesture is down, make sure it really is.
+        # Checked on the way in and while it is held: a missed release means
+        # either a shortcut that fires on its own or a recording that never ends,
+        # depending on whether it goes missing before or during one.
         held = all(key in self._down for key in self._gesture_keys)
+        if held and self._forget_stale():
+            held = all(key in self._down for key in self._gesture_keys)
         if held and not self._gesture_held:
             self._gesture_held = True
             self._gesture.press(time.monotonic())
         elif not held and self._gesture_held:
             self._gesture_held = False
             self._gesture.release(time.monotonic())
+
+    def _forget_stale(self) -> bool:
+        """Drop keys held only on paper, and say whether any had to go.
+
+        ``_down`` is built from the events the hook sees, and a release it never
+        sees leaves a key held forever. That happens: locking the screen with
+        Win+L, a UAC prompt, Ctrl+Alt+Del or switching virtual desktop all go
+        through the secure desktop, where a user-process hook stops receiving
+        events — let go of the key over there and nobody sees it come up.
+
+        The cost was a shortcut that fired on its own: with the gesture on
+        ctrl+windows and "windows" stuck down, pressing Ctrl alone was enough to
+        start recording. Lose both releases mid-dictation — lock the screen while
+        talking — and the recording never ends instead. So the record is checked
+        against what Windows says is actually pressed.
+        """
+        stale = {key for key in self._down if _is_down(key) is False}
+        if not stale:
+            return False
+        self._down -= stale
+        log.info(
+            "Ignoring a phantom shortcut: %s looked held but is not pressed — a key "
+            "release went missing (locking the screen or a system shortcut can eat "
+            "one).", ", ".join(sorted(stale)),
+        )
+        return True
 
     def stop(self) -> None:
         import keyboard
