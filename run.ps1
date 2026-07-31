@@ -44,9 +44,17 @@ function Get-PythonVersion {
     #>
     param([string]$Exe, [string[]]$Prefix = @())
     try {
-        $output = & $Exe @Prefix '-c' 'import sys; print("%d.%d" % sys.version_info[:2])' 2>$null
+        # No double quotes in the -c snippet: Windows PowerShell strips them on
+        # the way to a native process, and Python then dies of a syntax error
+        # that 2>$null hides, making every interpreter look unusable.
+        $output = & $Exe @Prefix '-c' 'import sys; print(sys.version.split()[0])' 2>$null
         if ($LASTEXITCODE -ne 0 -or -not $output) { return $null }
-        return [version]($output | Select-Object -Last 1).Trim()
+        # Major and minor only. A prerelease reports itself as 3.14.0rc1, which
+        # is not a [version] and would otherwise disqualify a working install.
+        if (($output | Select-Object -Last 1).Trim() -match '^(\d+)\.(\d+)') {
+            return [version]"$($Matches[1]).$($Matches[2])"
+        }
+        return $null
     } catch {
         return $null
     }
@@ -65,9 +73,12 @@ function Find-Python {
         $candidates += , @('py', @('-3'))
     }
     foreach ($name in @('python', 'python3')) {
-        $found = Get-Command $name -ErrorAction SilentlyContinue
-        if ($found -and $found.Source -notlike '*\WindowsApps\*') {
-            $candidates += , @($found.Source, @())
+        # -All, because the Store stub is often first on PATH and a real install
+        # sits behind it. Taking only the first match would miss it.
+        foreach ($found in @(Get-Command $name -All -ErrorAction SilentlyContinue)) {
+            if ($found.Source -and $found.Source -notlike '*\WindowsApps\*') {
+                $candidates += , @($found.Source, @())
+            }
         }
     }
 
