@@ -97,8 +97,10 @@ class HotkeyConfig:
     # Held for longer than this, it is push-to-talk; shorter, it waits to see if a
     # second tap arrives.
     gesture_hold_ms: int = 250
-    # How long to wait for that second tap.
-    gesture_double_ms: int = 350
+    # How long to wait for that second tap. Windows gives a double click 500 ms by
+    # default, and that is the rhythm a hand already has; letting go of two
+    # modifiers and finding them again is if anything slower than clicking twice.
+    gesture_double_ms: int = 500
 
 
 @dataclass

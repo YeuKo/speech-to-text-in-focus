@@ -43,9 +43,13 @@ mode = "gesture"
 # them by accident. Recording starts on the first press either way, so the
 # beginning of a sentence is never clipped.
 gesture = "ctrl+windows"
+# The two timings of the gesture, in milliseconds. Raise them if the double tap
+# does not take, lower them if a deliberate hold keeps being read as a tap.
 # Held longer than this it is push-to-talk; shorter, it waits for a second tap.
 gesture_hold_ms = 250
-gesture_double_ms = 350
+# How long that wait lasts — the window the second tap has to land in. Windows'
+# own double click gets 500 ms, which is the rhythm your hand already knows.
+gesture_double_ms = 500
 # Used when mode = "separate". Syntax of the "keyboard" library.
 toggle = "ctrl+alt+space"      # press to start / stop (or auto-stop on silence)
 push_to_talk = "ctrl+alt+v"    # hold while speaking

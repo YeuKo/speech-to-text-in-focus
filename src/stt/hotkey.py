@@ -50,6 +50,16 @@ _MODIFIER_VK: dict[str, tuple[int, ...]] = {
     "windows": (0x5B, 0x5C),        # VK_LWIN, VK_RWIN
 }
 
+# How long a key has to have been down before its being held is worth doubting.
+#
+# A release that went missing leaves a key down for as long as the user is away —
+# seconds, usually much longer. A key pressed a moment ago has lost nothing: what
+# looks like a contradiction there is just this code running late (see
+# _event_time). Asking Windows about it answers about *now*, and the answer to a
+# question about a keypress that has already come and gone is "not pressed" — so
+# the check used to throw away perfectly good taps, the quick ones first.
+_STALE_AFTER_S = 1.0
+
 # Side markers, in the languages Windows is likely to be running in.
 _SIDES = ("left", "right", "izquierda", "derecha", "izq", "der",
           "gauche", "droite", "links", "rechts", "sinistra", "destra")
@@ -85,6 +95,24 @@ def canonical_key(name: str | None, scan_code: int | None = None) -> str:
             key = key[: -len(side) - 1]
             break
     return _KEY_ALIASES.get(key, key).strip()
+
+
+def _event_time(event) -> float:
+    """When the key actually moved, not when this code got round to it.
+
+    ``keyboard`` stamps each event inside its low-level hook and then puts it on
+    a queue for a second thread to hand out. Between the stamp and the callback
+    there is a wait of unknown length — negligible when the app is idle, a good
+    fraction of a second while it is transcribing or fading the status pill in.
+
+    Timing a gesture by the clock at the moment of the callback therefore
+    stretches it by however busy the app happened to be: a tap of 100 ms could
+    measure as 400 and be read as push-to-talk instead. The stamp does not drift
+    like that.
+    """
+    when = getattr(event, "time", None)
+    # The same clock the library stamps with (time.time), so the two never mix.
+    return float(when) if when is not None else time.time()
 
 
 def _is_down(key: str) -> bool | None:
@@ -132,7 +160,10 @@ class HotkeyManager:
         gesture = self._cfg.gesture if self._cfg.mode == "gesture" else ""
         self._gesture_keys = [canonical_key(k) for k in gesture.split("+") if k.strip()]
         self._gesture_held = False
-        self._down: set[str] = set()
+        # Key -> when it went down, so a key held a long time can be told from
+        # one just pressed. Only the first press counts: auto-repeat must not
+        # make an old key look young.
+        self._down: dict[str, float] = {}
         self._gesture = GestureRecogniser(
             on_start=_safe(on_ptt_press),
             on_stop=_safe(on_ptt_release),
@@ -195,26 +226,27 @@ class HotkeyManager:
             return
 
         name = canonical_key(event.name, getattr(event, "scan_code", None))
+        when = _event_time(event)
         if event.event_type == keyboard.KEY_DOWN:
-            self._down.add(name)
+            self._down.setdefault(name, when)
         else:
-            self._down.discard(name)
+            self._down.pop(name, None)
 
         # Whenever the record says the gesture is down, make sure it really is.
         # Checked on the way in and while it is held: a missed release means
         # either a shortcut that fires on its own or a recording that never ends,
         # depending on whether it goes missing before or during one.
         held = all(key in self._down for key in self._gesture_keys)
-        if held and self._forget_stale():
+        if held and self._forget_stale(when):
             held = all(key in self._down for key in self._gesture_keys)
         if held and not self._gesture_held:
             self._gesture_held = True
-            self._gesture.press(time.monotonic())
+            self._gesture.press(when)
         elif not held and self._gesture_held:
             self._gesture_held = False
-            self._gesture.release(time.monotonic())
+            self._gesture.release(when)
 
-    def _forget_stale(self) -> bool:
+    def _forget_stale(self, now: float) -> bool:
         """Drop keys held only on paper, and say whether any had to go.
 
         ``_down`` is built from the events the hook sees, and a release it never
@@ -228,11 +260,18 @@ class HotkeyManager:
         start recording. Lose both releases mid-dictation — lock the screen while
         talking — and the recording never ends instead. So the record is checked
         against what Windows says is actually pressed.
+
+        Only for keys that have been down a while, though (_STALE_AFTER_S).
+        Windows answers about this instant, and a key tapped and let go before
+        this code ran is honestly reported as up — which made the check condemn
+        the very taps it was meant to protect, and the double tap with them.
         """
-        stale = {key for key in self._down if _is_down(key) is False}
+        stale = {key for key, since in self._down.items()
+                 if now - since >= _STALE_AFTER_S and _is_down(key) is False}
         if not stale:
             return False
-        self._down -= stale
+        for key in stale:
+            del self._down[key]
         log.info(
             "Ignoring a phantom shortcut: %s looked held but is not pressed — a key "
             "release went missing (locking the screen or a system shortcut can eat "
