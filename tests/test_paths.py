@@ -77,6 +77,22 @@ class TestResolveConfig:
         assert paths.resolve_config(None) == appdata / "config.toml"
 
 
+class TestAppDir:
+    def test_a_checkout_anchors_to_the_repo_not_the_cwd(self, tmp_path, monkeypatch):
+        """Starting ``stt`` from elsewhere must not hide the checkout's config.toml."""
+        monkeypatch.setattr(paths, "is_frozen", lambda: False)
+        monkeypatch.chdir(tmp_path)
+        assert paths.app_dir() == paths.bundle_dir()
+        assert (paths.app_dir() / "pyproject.toml").exists()
+
+    def test_falls_back_to_the_cwd_outside_a_checkout(self, tmp_path, monkeypatch):
+        """Installed non-editable: the folder above the package is site-packages."""
+        monkeypatch.setattr(paths, "is_frozen", lambda: False)
+        monkeypatch.setattr(paths, "bundle_dir", lambda: tmp_path / "site-packages")
+        monkeypatch.chdir(tmp_path)
+        assert paths.app_dir() == tmp_path
+
+
 class TestAnchor:
     def test_relative_paths_follow_the_config(self, tmp_path):
         cfg = config.from_dict({})

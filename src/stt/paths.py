@@ -53,10 +53,21 @@ def bundled_file(name: str) -> Path:
 
 
 def app_dir() -> Path:
-    """Folder the app runs from: the executable's when packaged, else the cwd."""
+    """Folder the app runs from: the executable's when packaged, else the checkout.
+
+    In a checkout this is the repo root rather than the current directory. Following
+    the cwd meant that starting ``stt`` from anywhere else — a shell sitting in the
+    user's home, a shortcut — silently ignored the config.toml in the checkout and
+    dropped a fresh one wherever the user happened to be standing.
+
+    Falls back to the cwd when the sources are not in a checkout (an installed,
+    non-editable copy), where the folder above the package is site-packages and has
+    no business holding anyone's settings.
+    """
     if is_frozen():
         return Path(sys.executable).resolve().parent
-    return Path.cwd()
+    root = bundle_dir()
+    return root if (root / "pyproject.toml").exists() else Path.cwd()
 
 
 def user_data_dir() -> Path:

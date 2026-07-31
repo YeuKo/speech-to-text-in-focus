@@ -45,3 +45,6 @@ htmlcov/
 
 # Internal planning notes, superseded by the README
 PLAN.md
+
+# Internal working notes, in Spanish and full of local paths.
+notas/

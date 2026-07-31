@@ -60,16 +60,35 @@ Program Files, settings go to `%APPDATA%\speech-to-text-in-focus` instead.
 
 ### From source
 
+No SmartScreen warning, and nothing is installed system-wide: everything lives in the
+folder you clone into, `.venv` included.
+
 ```powershell
 git clone https://github.com/YeuKo/speech-to-text-in-focus.git
 cd speech-to-text-in-focus
+.\run.ps1
+```
 
+`run.ps1` creates the virtual environment on the first run, installs the dependencies
+and starts the app. To update later, `git pull` and run it again: the package is
+installed in editable mode, so new code needs no reinstall and only a change to
+`pyproject.toml` triggers one. Arguments go through to the app
+(`.\run.ps1 --list-devices`), and `-Reinstall` rebuilds the dependencies if the
+environment ever breaks.
+
+<details>
+<summary>The same thing by hand</summary>
+
+```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -e ".[windows]"
-
-copy config.example.toml config.toml   # optional: customise settings
+stt
 ```
+</details>
+
+Settings live in `config.toml` next to the sources; without one the app runs on factory
+defaults. Run `copy config.example.toml config.toml` to start customising.
 
 ## Usage
 
