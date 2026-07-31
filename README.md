@@ -124,18 +124,22 @@ stt --set-api-key     # store your OpenAI API key securely (keyring)
 stt --version
 ```
 
-### “It only hears me if I lean into the microphone”
+### Poor recognition, or a microphone that sounds too quiet
 
-Two things differ from dictating in a browser tab:
+If words go missing unless you speak close to the microphone, check these two, in order:
 
-1. **The device.** `auto` follows the Windows default, which is often *not* the one
-   you speak into — a headset left plugged in outranks the laptop's microphone
-   array. Check with `stt --list-devices` and pick one from the tray → **Microphone**.
-2. **The gain.** A browser applies automatic gain control to the microphone stream;
-   recording the raw signal does not. `auto_gain` (on by default) levels the
-   recording before transcribing, and `gain` raises the captured signal itself,
-   which also makes the “did they start talking?” detection more sensitive. Run
-   `stt --calibrate-mic` and it suggests a value for your voice and distance.
+1. **The input device.** `auto` follows the Windows default, which is often *not* the
+   one you speak into — a headset left plugged in outranks the laptop's microphone
+   array. Run `stt --list-devices` to see what is available, then pick the right one
+   from the tray → **Microphone**.
+2. **The level.** Browsers apply automatic gain control to the microphone stream;
+   recording the raw signal does not. `auto_gain` (on by default) levels the recording
+   before transcribing, and `gain` raises the captured signal itself, which also makes
+   speech detection more sensitive. Run `stt --calibrate-mic` for a value measured
+   against your own voice and distance.
+
+Worth checking in Windows too: **Settings → System → Sound → Input**, where the device
+level and any *Microphone Boost* live.
 
 ### It transcribes while you speak
 
@@ -231,16 +235,21 @@ terms = ["Anthropic", "Kubernetes", "Grafana"]   # biases Whisper towards these
 Hotkey ─▶ Controller (state machine) ─▶ Recorder (mic + VAD)
                   │                              │
                   ▼                              ▼
-            Tray UI (status)            Transcriber backend
-                                        ├─ Local (faster-whisper)
-                                        └─ OpenAI API
+            Tray UI (status)            Transcriber backend  ◀── priming prompt:
+                                        ├─ Local (faster-whisper)  dictionary terms +
+                                        └─ OpenAI API              the text so far
                                                │
                                                ▼
-                                   Post‑process (dictionary)
+                                   Post‑process: replacements,
+                                   repeat and echo filtering
                                                │
                                                ▼
                                    Text injector (clipboard ▶ Ctrl+V)
 ```
+
+The dictionary is used at both ends: `terms` bias the model *before* it decodes, as a
+priming prompt, and `replacements` correct the text *after*. The same step drops a chunk
+that only recites the prompt back — a hallucination Whisper falls into over near‑silence.
 
 ```
 src/stt/

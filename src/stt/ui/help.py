@@ -186,7 +186,7 @@ under <code>[engine]</code> in <code>config.toml</code>):</p>
       is discarded on purpose rather than transcribed: asked to transcribe
       silence, Whisper invents text — usually your own vocabulary list. The log
       says <code>No speech in the recording</code>.</li>
-  <li><b>It only hears me if I lean into the microphone</b> — first check
+  <li><b>Poor recognition, or a microphone that sounds too quiet</b> — first check
       tray → <b>Microphone</b>: <i>Windows default</i> is often not the one you talk
       into (a plugged-in headset outranks the laptop's array). Currently recording
       from <b>{microphone}</b>. If that is right, run
