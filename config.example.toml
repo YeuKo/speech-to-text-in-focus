@@ -67,8 +67,8 @@ sound = "off"
 # — set sound = "off" and keep just this if you prefer. Native Windows
 # notifications were tried and removed: they pile up in the Action Center.
 overlay = true
-# Corner it appears in, taskbar excluded: "bottom-right" (next to the tray),
-# "bottom-left", "top-right" or "top-left".
+# Where it appears, taskbar excluded: "bottom-right" (next to the tray),
+# "bottom-center", "bottom-left", "top-right", "top-center" or "top-left".
 overlay_position = "bottom-right"
 
 [audio]

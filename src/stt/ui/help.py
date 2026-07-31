@@ -129,8 +129,8 @@ channels:</p>
 <ul>
   <li><b>Sound</b> — <i>Windows sounds</i> (soft, follow your volume), <i>Beeps</i>
       (loud) or <i>Silent</i>. Currently: <b>{sound}</b>.</li>
-  <li><b>Floating status pill</b> — a small note above the tray that says what is
-      happening and fades on its own. Currently: <b>{overlay}</b>.</li>
+  <li><b>Floating status pill</b> — a small note at the edge of the screen that
+      says what is happening and fades on its own. Currently: <b>{overlay}</b>.</li>
 </ul>
 <div class="tip">The pill is the quiet option: set the sound to <i>Silent</i> and
 you still see everything. Native Windows notifications were tried and removed —

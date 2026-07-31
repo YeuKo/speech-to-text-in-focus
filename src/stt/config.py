@@ -24,7 +24,10 @@ COMPUTE_TYPES = ("auto", "int8", "int8_float16", "float16", "float32")
 SHORTCUT_MODES = ("separate", "gesture")
 INJECTION_METHODS = ("clipboard", "type")
 SOUND_MODES = ("system", "beeps", "off")
-OVERLAY_POSITIONS = ("bottom-right", "bottom-left", "top-right", "top-left")
+OVERLAY_POSITIONS = (
+    "bottom-right", "bottom-center", "bottom-left",
+    "top-right", "top-center", "top-left",
+)
 LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
 
 

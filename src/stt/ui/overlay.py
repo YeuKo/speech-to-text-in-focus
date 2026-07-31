@@ -1,6 +1,6 @@
 """Floating status pill: silent, at-a-glance feedback while dictating.
 
-A small borderless window in a corner of the screen (next to the tray by default),
+A small borderless window at an edge of the screen (next to the tray by default),
 coloured by state, that goes away on its own. Unlike a Windows notification it
 leaves nothing behind in the Action Center, which is what makes it bearable dozens
 of times a day.
@@ -103,10 +103,19 @@ def _work_area(fallback_w: int, fallback_h: int) -> tuple[int, int, int, int]:
     return 0, 0, fallback_w, fallback_h
 
 
-def _corner(position: str, w: int, h: int, area: tuple[int, int, int, int]) -> tuple[int, int]:
-    """Top-left coordinates that place a w x h pill in the requested corner."""
+def _place(position: str, w: int, h: int, area: tuple[int, int, int, int]) -> tuple[int, int]:
+    """Top-left coordinates that put a w x h pill where ``position`` asks for it."""
     left, top, right, bottom = area
-    x = left + _MARGIN if position.endswith("left") else right - w - _MARGIN
+    if position.endswith("center"):
+        # Centred on the work area, so the pill sits under whatever you are
+        # typing into rather than off at one side. Its width follows the text,
+        # so a centred pill shifts a little sideways from one state to the next
+        # — the middle stays put, the edges move.
+        x = left + (right - left - w) // 2
+    elif position.endswith("left"):
+        x = left + _MARGIN
+    else:
+        x = right - w - _MARGIN
     y = top + _MARGIN if position.startswith("top") else bottom - h - _MARGIN
     return x, y
 
@@ -247,7 +256,7 @@ class StatusOverlay:
                 state["hide_job"] = None
 
         def _layout(kind: str, text: str) -> None:
-            """Redraw the pill for a new state and place it in its corner."""
+            """Redraw the pill for a new state and put it back in its place."""
             accent = _ACCENTS.get(kind, _DEFAULT_ACCENT)
             wave = kind in (_LIVE, _WORKING)
 
@@ -281,7 +290,7 @@ class StatusOverlay:
             # top-left corner instead of by the tray.
             root.update_idletasks()
             area = _work_area(root.winfo_screenwidth(), root.winfo_screenheight())
-            px, py = _corner(self._position, w, height, area)
+            px, py = _place(self._position, w, height, area)
             root.geometry(f"{w}x{height}+{px}+{py}")
 
         def _animate() -> None:
