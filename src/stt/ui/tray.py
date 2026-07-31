@@ -54,21 +54,32 @@ def _fmt_combo(combo: str) -> str:
 
 
 def _make_image(color: tuple[int, int, int]):
-    """Draw a microphone silhouette in ``color`` on a transparent 64x64 canvas.
+    """Draw the microphone badge in ``color`` on a transparent 64x64 canvas.
 
-    Windows renders tray icons at 16x16 (more at high DPI), so the shape is kept
-    deliberately chunky: a capsule, a thick U bracket and a stem. Thinner
-    details (a base bar, a grille) turn to mush once downscaled.
+    A filled disc with the microphone knocked out of it, rather than a bare
+    silhouette. Windows puts its own microphone in the tray whenever something
+    is recording — which is precisely when ours is there too, right beside it —
+    and two outlined mics of the same weight are one shape at 16x16, whatever
+    their colour. A solid disc has nothing in common with a line glyph, so the
+    two tell themselves apart without anyone having to look twice.
+
+    Windows renders tray icons at 16x16 (more at high DPI), so the mic inside is
+    kept deliberately chunky: a capsule, a bracket and a stem, nothing thinner.
+    The bracket hangs well clear of the capsule — any closer and the two merge
+    into one wedge as it is downscaled, which is how the previous icon ended up
+    reading as a downward arrow.
     """
     from PIL import Image, ImageDraw
 
     size = 64
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-    fill = color + (255,)
-    draw.rounded_rectangle([25, 2, 39, 38], radius=7, fill=fill)   # capsule
-    draw.arc([13, 18, 51, 56], start=0, end=180, fill=fill, width=8)  # bracket
-    draw.rectangle([29, 54, 35, 62], fill=fill)                    # stem
+    draw.ellipse([1, 1, size - 2, size - 2], fill=color + (255,))
+
+    mic = (255, 255, 255, 255)
+    draw.rounded_rectangle([28, 14, 36, 33], radius=4, fill=mic)      # capsule
+    draw.arc([19, 21, 45, 47], start=0, end=180, fill=mic, width=5)   # bracket
+    draw.rectangle([30, 44, 34, 50], fill=mic)                        # stem
     return img
 
 
