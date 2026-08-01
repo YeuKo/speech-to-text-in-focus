@@ -17,10 +17,10 @@ import webbrowser
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from stt.audio.devices import describe_current
+from s2f.audio.devices import describe_current
 
 if TYPE_CHECKING:
-    from stt.config import Config
+    from s2f.config import Config
 
 log = logging.getLogger(__name__)
 
@@ -89,7 +89,7 @@ def _build_html(cfg: "Config") -> str:
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Speech to Text in Focus — Instructions</title>
+<title>Speech to Focus — Instructions</title>
 <style>
   body {{ font-family: Segoe UI, system-ui, sans-serif; max-width: 760px;
          margin: 40px auto; padding: 0 20px; color: #1c2230; line-height: 1.55; }}
@@ -106,7 +106,7 @@ def _build_html(cfg: "Config") -> str:
 </style>
 </head>
 <body>
-<h1>🎙️ Speech to Text in Focus</h1>
+<h1>🎙️ Speech to Focus</h1>
 <p class="pill">Backend: {backend} &nbsp;•&nbsp; Auto-stop: {auto_stop}</p>
 
 <p>Speak and have your words typed wherever your cursor is. Works in any app:
@@ -171,7 +171,7 @@ under <code>[engine]</code> in <code>config.toml</code>):</p>
   <li><b>Local</b> — runs on your computer. Free and private. Faster with an
       NVIDIA GPU (CUDA 12.x).</li>
   <li><b>OpenAI API</b> — uses the OpenAI API. Needs your own API key: set it from
-      the tray menu → <b>Set OpenAI API key…</b> (or <code>stt --set-api-key</code>).
+      the tray menu → <b>Set OpenAI API key…</b> (or <code>s2f --set-api-key</code>).
       Billed by audio length; silences are trimmed automatically to reduce cost,
       and each transcription's estimated cost is logged and shown under
       tray → <b>Usage / cost</b>.</li>
@@ -190,7 +190,7 @@ under <code>[engine]</code> in <code>config.toml</code>):</p>
       tray → <b>Microphone</b>: <i>Windows default</i> is often not the one you talk
       into (a plugged-in headset outranks the laptop's array). Currently recording
       from <b>{microphone}</b>. If that is right, run
-      <code>stt --calibrate-mic</code>: it measures your voice and suggests a
+      <code>s2f --calibrate-mic</code>: it measures your voice and suggests a
       <code>gain</code> for <code>config.toml</code>. Browsers apply automatic gain
       control to the microphone, which is why the same voice sounds louder in a web
       page than in an app that records the raw signal.</li>
@@ -198,7 +198,7 @@ under <code>[engine]</code> in <code>config.toml</code>):</p>
       combination. Build a different one in tray → <b>Change shortcut</b>: tick the
       modifiers, pick a key, and it warns you about the risky ones.</li>
   <li><b>Text doesn't paste</b> — some elevated windows block paste; try a normal
-      app first. Logs are in <code>logs/stt.log</code>.</li>
+      app first. Logs are in <code>logs/s2f.log</code>.</li>
 </ul>
 
 <p style="color:#8a93a5; margin-top:2.5em; font-size:.9em;">Quit anytime from the
@@ -210,7 +210,7 @@ tray icon → Quit.</p>
 def open_instructions(cfg: "Config") -> None:
     """Write the instructions to a temp HTML file and open it in the browser."""
     try:
-        path = _write_temp("stt_instructions.html", _build_html(cfg))
+        path = _write_temp("s2f_instructions.html", _build_html(cfg))
         _open(path)
         log.info("Instructions opened: %s", path)
     except Exception:
@@ -289,7 +289,7 @@ def _build_usage_html(cfg: "Config") -> str:
 
     return (
         '<!doctype html><html lang="en"><head><meta charset="utf-8">'
-        f"<title>Speech to Text in Focus — Usage &amp; Cost</title><style>{style}</style></head>"
+        f"<title>Speech to Focus — Usage &amp; Cost</title><style>{style}</style></head>"
         f"<body><h1>💸 Usage &amp; Cost</h1>{body}</body></html>"
     )
 
@@ -297,7 +297,7 @@ def _build_usage_html(cfg: "Config") -> str:
 def open_usage_report(cfg: "Config") -> None:
     """Generate and open a usage/cost report (always works, even with no data)."""
     try:
-        path = _write_temp("stt_usage.html", _build_usage_html(cfg))
+        path = _write_temp("s2f_usage.html", _build_usage_html(cfg))
         _open(path)
         log.info("Usage report opened: %s", path)
     except Exception:

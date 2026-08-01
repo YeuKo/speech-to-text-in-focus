@@ -29,13 +29,13 @@ VERSION_FILE = REPO / "packaging" / "version_info.txt"
 FASTER_WHISPER_DATA = collect_data_files("faster_whisper")
 
 a = Analysis(
-    [str(REPO / "src" / "stt" / "__main__.py")],
+    [str(REPO / "src" / "s2f" / "__main__.py")],
     pathex=[str(REPO / "src")],
     binaries=[],
     datas=[
         # The template the app copies to config.toml on a first run.
         (str(REPO / "config.example.toml"), "."),
-        (str(REPO / "assets" / "stt.ico"), "assets"),
+        (str(REPO / "assets" / "s2f.ico"), "assets"),
         (str(REPO / "README.md"), "."),
         (str(REPO / "LICENSE"), "."),
     ] + FASTER_WHISPER_DATA,
@@ -61,14 +61,14 @@ exe = EXE(                            # noqa: F821
     a.scripts,
     [],
     exclude_binaries=True,
-    name="stt",
+    name="s2f",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,                        # UPX-packed DLLs trip antivirus heuristics
     console=False,
     disable_windowed_traceback=False,
-    icon=str(REPO / "assets" / "stt.ico"),
+    icon=str(REPO / "assets" / "s2f.ico"),
     version=str(VERSION_FILE) if VERSION_FILE.exists() else None,
 )
 
@@ -78,5 +78,5 @@ coll = COLLECT(                       # noqa: F821
     a.datas,
     strip=False,
     upx=False,
-    name="speech-to-text-in-focus",
+    name="speech-to-focus",
 )

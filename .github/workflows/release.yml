@@ -38,7 +38,7 @@ jobs:
       # downloadable from the run.
       - uses: actions/upload-artifact@v4
         with:
-          name: speech-to-text-in-focus-win64
+          name: speech-to-focus-win64
           path: dist/*.zip
           if-no-files-found: error
 
@@ -51,7 +51,7 @@ jobs:
           body: |
             ## Install
 
-            Download the zip, unzip it anywhere you can write to, and run `stt.exe`.
+            Download the zip, unzip it anywhere you can write to, and run `s2f.exe`.
             A microphone appears in the system tray.
 
             **First run takes a few minutes**: the speech model (1.6 GB with an

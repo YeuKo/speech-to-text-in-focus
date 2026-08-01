@@ -1,4 +1,4 @@
-"""Generate assets/stt.ico from the same microphone the tray draws.
+"""Generate assets/s2f.ico from the same microphone the tray draws.
 
 Run after changing the icon shape:  python scripts/make_icon.py
 
@@ -14,13 +14,13 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 
-from stt.ui.tray import _COLORS, _make_image  # noqa: E402
+from s2f.ui.tray import _COLORS, _make_image  # noqa: E402
 
 SIZES = [(256, 256), (48, 48), (32, 32), (24, 24), (16, 16)]
 
 
 def main() -> int:
-    target = REPO / "assets" / "stt.ico"
+    target = REPO / "assets" / "s2f.ico"
     target.parent.mkdir(parents=True, exist_ok=True)
 
     # Idle blue: the app at rest, which is how the icon is seen out of context.

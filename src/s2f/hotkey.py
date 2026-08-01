@@ -8,7 +8,7 @@ Two ways to trigger dictation, and only one is live at a time (``hotkey.mode``):
 
 Registering only the chosen mode is deliberate. With both live, a user who set up
 a gesture would still have two other combinations doing something else, and no
-way to tell which one acted. See stt.gesture for the state machine; this module
+way to tell which one acted. See s2f.gesture for the state machine; this module
 only turns key events into presses and releases.
 """
 
@@ -19,10 +19,10 @@ import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from stt.gesture import GestureRecogniser
+from s2f.gesture import GestureRecogniser
 
 if TYPE_CHECKING:
-    from stt.config import HotkeyConfig
+    from s2f.config import HotkeyConfig
 
 log = logging.getLogger(__name__)
 

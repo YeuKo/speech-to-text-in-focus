@@ -1,5 +1,5 @@
-from stt import hotkey
-from stt.config import HotkeyConfig
+from s2f import hotkey
+from s2f.config import HotkeyConfig
 
 # Scan codes, which is what the manager resolves modifiers by.
 _CTRL, _WIN = 29, 91
@@ -26,7 +26,7 @@ def _manager() -> tuple[hotkey.HotkeyManager, list[str]]:
     ``gesture_hold_ms=0`` makes every release count as a hold, so a release stops
     the recording there and then instead of waiting out the double-tap window.
     What is under test here is which key events turn into presses and releases;
-    deciding tap from hold is stt.gesture's job and has its own clock.
+    deciding tap from hold is s2f.gesture's job and has its own clock.
     """
     calls: list[str] = []
     cfg = HotkeyConfig(mode="gesture", gesture="ctrl+windows", gesture_hold_ms=0)
@@ -152,7 +152,7 @@ class TestPhantomShortcut:
 class TestGestureTiming:
     """Key events in, gestures out: the two halves working together.
 
-    stt.gesture is tested on its own with a clock it is handed; what these check
+    s2f.gesture is tested on its own with a clock it is handed; what these check
     is that the clock it gets here is the one the keys moved by, not the one the
     callback happens to run at.
     """

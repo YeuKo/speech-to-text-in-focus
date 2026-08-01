@@ -19,7 +19,7 @@ import logging
 import threading
 from collections.abc import Callable, Sequence
 
-from stt.ui import known_combos, release_default_root
+from s2f.ui import known_combos, release_default_root
 
 log = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ def message_box(title: str, text: str, *, error: bool = False) -> None:
         except Exception:
             log.info("%s: %s", title, text)
 
-    threading.Thread(target=_show, daemon=True, name="stt-msgbox").start()
+    threading.Thread(target=_show, daemon=True, name="s2f-msgbox").start()
 
 
 def _force_foreground(root) -> None:
@@ -114,7 +114,7 @@ def _dialog(title: str, build: Callable[[object], None], *, thread_name: str) ->
                     pass
                 # This thread owns the Tk interpreter's whole lifecycle, its
                 # finalisation included: Tcl aborts if that happens on another
-                # thread. See release_default_root and stt.ui.overlay.
+                # thread. See release_default_root and s2f.ui.overlay.
                 release_default_root(root)
             root = None
             gc.collect()
@@ -176,7 +176,7 @@ def ask_api_key(on_save: Callable[[str], None]) -> None:
         root.bind("<Escape>", lambda _e: root.destroy())
         entry.focus_set()
 
-    _dialog("OpenAI API key", _build, thread_name="stt-apikey")
+    _dialog("OpenAI API key", _build, thread_name="s2f-apikey")
 
 
 _TERMS_HELP = (
@@ -238,7 +238,7 @@ def edit_terms(current: Sequence[str], on_save: Callable[[list[str]], None]) -> 
         root.bind("<Escape>", lambda _e: root.destroy())
         box.focus_set()
 
-    _dialog("Custom words", _build, thread_name="stt-terms")
+    _dialog("Custom words", _build, thread_name="s2f-terms")
 
 
 # --- shortcut builder -------------------------------------------------------
@@ -427,7 +427,7 @@ def build_hotkey(
 
         key_box.focus_set()
 
-    _dialog(f"Shortcut for {title}", _build, thread_name="stt-hotkey")
+    _dialog(f"Shortcut for {title}", _build, thread_name="s2f-hotkey")
 
 
 __all__ = ["message_box", "ask_api_key", "edit_terms", "build_hotkey"]

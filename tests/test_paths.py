@@ -7,7 +7,7 @@ Program Files, and only shows up as "my settings do not stick".
 
 import pytest
 
-from stt import config, paths
+from s2f import config, paths
 
 
 class TestIsWritable:
@@ -79,7 +79,7 @@ class TestResolveConfig:
 
 class TestAppDir:
     def test_a_checkout_anchors_to_the_repo_not_the_cwd(self, tmp_path, monkeypatch):
-        """Starting ``stt`` from elsewhere must not hide the checkout's config.toml."""
+        """Starting ``s2f`` from elsewhere must not hide the checkout's config.toml."""
         monkeypatch.setattr(paths, "is_frozen", lambda: False)
         monkeypatch.chdir(tmp_path)
         assert paths.app_dir() == paths.bundle_dir()
@@ -119,9 +119,9 @@ class TestAnchor:
 
 class TestBundledFiles:
     def test_the_template_ships_with_the_app(self):
-        """packaging/stt.spec copies it in; the app needs it on a first run."""
+        """packaging/s2f.spec copies it in; the app needs it on a first run."""
         assert paths.bundled_file(paths.TEMPLATE_NAME).exists()
 
-    @pytest.mark.parametrize("name", ["config.example.toml", "assets/stt.ico"])
+    @pytest.mark.parametrize("name", ["config.example.toml", "assets/s2f.ico"])
     def test_files_listed_in_the_spec_exist(self, name):
-        assert (paths.bundle_dir() / name).exists(), f"{name} is in stt.spec but missing"
+        assert (paths.bundle_dir() / name).exists(), f"{name} is in s2f.spec but missing"

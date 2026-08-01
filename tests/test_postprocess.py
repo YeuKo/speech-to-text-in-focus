@@ -1,6 +1,6 @@
 import pytest
 
-from stt import postprocess
+from s2f import postprocess
 
 
 class TestBuildPrompt:

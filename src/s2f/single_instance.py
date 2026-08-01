@@ -18,7 +18,7 @@ log = logging.getLogger(__name__)
 
 # Global\ makes it machine-wide rather than per-session. The name is arbitrary
 # but must not change: it is the handshake between two copies of the app.
-_MUTEX_NAME = r"Global\stt-dictation-single-instance"
+_MUTEX_NAME = r"Global\s2f-dictation-single-instance"
 
 _ERROR_ALREADY_EXISTS = 183
 

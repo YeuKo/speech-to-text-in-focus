@@ -224,7 +224,7 @@ class TrayIcon:
             pystray.MenuItem("Quit", self._handle_quit),
         )
         self._icon = pystray.Icon(
-            "stt",
+            "s2f",
             icon=self._images["idle"],
             title=self._tooltip("idle"),
             menu=menu,
@@ -261,7 +261,7 @@ class TrayIcon:
         """
         import pystray
 
-        from stt.audio.devices import list_input_devices
+        from s2f.audio.devices import list_input_devices
 
         def _item(value: str, label: str):
             return pystray.MenuItem(
@@ -415,10 +415,12 @@ class TrayIcon:
         gesture = self._current_mode() == "gesture"
         combo = _fmt_combo(self._current_gesture() if gesture else self._current_toggle())
         if state == "idle":
-            return f"STT — {label} · {'hold' if gesture else 'press'} {combo} to dictate"
-        if state == "recording":
-            return f"STT — {label} · {'release' if gesture else 'press'} {combo} to stop"
-        return f"STT — {label}"
+            next_step = f" · {'hold' if gesture else 'press'} {combo} to dictate"
+        elif state == "recording":
+            next_step = f" · {'release' if gesture else 'press'} {combo} to stop"
+        else:
+            next_step = ""
+        return f"Speech to Focus — {label}{next_step}"
 
     def run(self) -> None:
         """Blocking: start the tray event loop (main thread)."""

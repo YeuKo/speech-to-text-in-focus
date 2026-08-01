@@ -15,7 +15,7 @@ import tomllib
 from collections.abc import Sequence
 from pathlib import Path
 
-from stt.paths import TEMPLATE_NAME, bundled_file
+from s2f.paths import TEMPLATE_NAME, bundled_file
 
 log = logging.getLogger(__name__)
 

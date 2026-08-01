@@ -1,4 +1,4 @@
-# Speech to Text in Focus
+# Speech to Focus
 
 > Press a hotkey, speak, and your words are typed wherever your cursor is — in any Windows app.
 
@@ -41,14 +41,14 @@ private), with an optional **OpenAI API** backend for machines without a capable
 
 ### Download the release (no Python needed)
 
-1. Grab `speech-to-text-in-focus-<version>-win64.zip` from the
-   [releases page](https://github.com/YeuKo/speech-to-text-in-focus/releases) (~105 MB).
+1. Grab `speech-to-focus-<version>-win64.zip` from the
+   [releases page](https://github.com/YeuKo/speech-to-focus/releases) (~105 MB).
 2. Unzip it wherever you like — Documents, a USB stick, anywhere you can write.
-3. Run **`stt.exe`**. A microphone appears in the system tray.
+3. Run **`s2f.exe`**. A microphone appears in the system tray.
 
 Everything the app writes (`config.toml`, `logs/`) stays inside that folder, so
 deleting it removes the app completely. If you unzip it somewhere read-only, such as
-Program Files, settings go to `%APPDATA%\speech-to-text-in-focus` instead.
+Program Files, settings go to `%APPDATA%\speech-to-focus` instead.
 
 > **First run takes a few minutes.** The speech model (1.6 GB with a GPU, 464 MB on
 > CPU) is downloaded from Hugging Face and cached in `%USERPROFILE%\.cache\huggingface`;
@@ -64,8 +64,8 @@ No SmartScreen warning, and nothing is installed system-wide: everything lives i
 folder you clone into, `.venv` included.
 
 ```powershell
-git clone https://github.com/YeuKo/speech-to-text-in-focus.git
-cd speech-to-text-in-focus
+git clone https://github.com/YeuKo/speech-to-focus.git
+cd speech-to-focus
 .\run.ps1
 ```
 
@@ -83,7 +83,7 @@ environment ever breaks.
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -e ".[windows]"
-stt
+s2f
 ```
 </details>
 
@@ -93,7 +93,7 @@ defaults. Run `copy config.example.toml config.toml` to start customising.
 ## Usage
 
 ```powershell
-stt
+s2f
 ```
 
 The app starts in the **system tray**. Then:
@@ -117,11 +117,11 @@ Shortcuts and everything else are configured in `config.toml` (see `config.examp
 ### Command‑line tools
 
 ```powershell
-stt --selftest        # synthesize speech with the Windows voice and transcribe it (no mic)
-stt --list-devices    # list the microphones you can record from
-stt --calibrate-mic   # measure your voice, recommend a silence threshold and a gain
-stt --set-api-key     # store your OpenAI API key securely (keyring)
-stt --version
+s2f --selftest        # synthesize speech with the Windows voice and transcribe it (no mic)
+s2f --list-devices    # list the microphones you can record from
+s2f --calibrate-mic   # measure your voice, recommend a silence threshold and a gain
+s2f --set-api-key     # store your OpenAI API key securely (keyring)
+s2f --version
 ```
 
 ### Poor recognition, or a microphone that sounds too quiet
@@ -130,12 +130,12 @@ If words go missing unless you speak close to the microphone, check these two, i
 
 1. **The input device.** `auto` follows the Windows default, which is often *not* the
    one you speak into — a headset left plugged in outranks the laptop's microphone
-   array. Run `stt --list-devices` to see what is available, then pick the right one
+   array. Run `s2f --list-devices` to see what is available, then pick the right one
    from the tray → **Microphone**.
 2. **The level.** Browsers apply automatic gain control to the microphone stream;
    recording the raw signal does not. `auto_gain` (on by default) levels the recording
    before transcribing, and `gain` raises the captured signal itself, which also makes
-   speech detection more sensitive. Run `stt --calibrate-mic` for a value measured
+   speech detection more sensitive. Run `s2f --calibrate-mic` for a value measured
    against your own voice and distance.
 
 Worth checking in Windows too: **Settings → System → Sound → Input**, where the device
@@ -174,7 +174,7 @@ the end.
 | Setup | None | Your own API key |
 
 Switch anytime from the tray → **Engine**. For the API backend, set your key via the
-tray (**Set OpenAI API key…**) or `stt --set-api-key`; silences are trimmed before
+tray (**Set OpenAI API key…**) or `s2f --set-api-key`; silences are trimmed before
 sending to keep the bill low, and each transcription's estimated cost is recorded to
 `logs/usage.csv` (viewable from the tray → *Usage / cost*).
 
@@ -252,7 +252,7 @@ priming prompt, and `replacements` correct the text *after*. The same step drops
 that only recites the prompt back — a hallucination Whisper falls into over near‑silence.
 
 ```
-src/stt/
+src/s2f/
 ├── __main__.py          # entry point, CLI, tray wiring
 ├── controller.py        # state machine (idle / recording / transcribing)
 ├── config.py            # typed TOML config + validation
@@ -281,10 +281,10 @@ ruff check src tests
 
 ```powershell
 pip install -e ".[windows,build]"
-python scripts/build.py       # -> dist\speech-to-text-in-focus\ and the .zip beside it
+python scripts/build.py       # -> dist\speech-to-focus\ and the .zip beside it
 ```
 
-`packaging/stt.spec` documents the choices: a folder build rather than a single file
+`packaging/s2f.spec` documents the choices: a folder build rather than a single file
 (onefile would unpack 250 MB on every launch), no console window, and neither CUDA
 nor the model bundled — the app uses the GPU when the machine has the CUDA 12.x
 runtime and downloads the model on first use.

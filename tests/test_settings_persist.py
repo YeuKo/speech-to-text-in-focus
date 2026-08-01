@@ -9,7 +9,7 @@ wiring rather than trusting each new handler to remember.
 import ast
 import pathlib
 
-MAIN = pathlib.Path(__file__).resolve().parents[1] / "src" / "stt" / "__main__.py"
+MAIN = pathlib.Path(__file__).resolve().parents[1] / "src" / "s2f" / "__main__.py"
 
 # The tray constructor argument -> the handler that must write to config.toml.
 # A setting that is deliberately session-only would be listed here with a reason.

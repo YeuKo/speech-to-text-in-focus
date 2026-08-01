@@ -1,6 +1,6 @@
 import pytest
 
-from stt import config
+from s2f import config
 
 
 class TestFeedbackSection:

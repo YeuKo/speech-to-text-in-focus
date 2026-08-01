@@ -6,10 +6,10 @@ __pycache__/
 build/
 dist/
 
-# PyInstaller writes .spec files next to whatever it builds, but packaging/stt.spec
+# PyInstaller writes .spec files next to whatever it builds, but packaging/s2f.spec
 # is ours and hand-written: without it the release cannot be built.
 *.spec
-!packaging/stt.spec
+!packaging/s2f.spec
 
 # Virtual envs
 .venv/

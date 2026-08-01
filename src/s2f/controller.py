@@ -11,15 +11,15 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from stt import postprocess, sounds
-from stt.audio.recorder import Recorder
-from stt.audio.silence import has_speech, normalise_level
-from stt.hotkey import HotkeyManager
-from stt.inject import TextInjector
-from stt.transcribe import create_backend
+from s2f import postprocess, sounds
+from s2f.audio.recorder import Recorder
+from s2f.audio.silence import has_speech, normalise_level
+from s2f.hotkey import HotkeyManager
+from s2f.inject import TextInjector
+from s2f.transcribe import create_backend
 
 if TYPE_CHECKING:
-    from stt.config import Config
+    from s2f.config import Config
 
 log = logging.getLogger(__name__)
 
@@ -43,11 +43,11 @@ class Controller:
         self._backend_lock = threading.Lock()
         self.startup_warning: str | None = None
         self._prompt = postprocess.build_prompt(config.dictionary.terms)
-        self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="stt-tx")
+        self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="s2f-tx")
         # User-facing events go through their own single worker: drawing the
         # status pill must never delay recording or stall the hotkey thread. One
         # worker also keeps the events in order.
-        self._notifier = ThreadPoolExecutor(max_workers=1, thread_name_prefix="stt-notify")
+        self._notifier = ThreadPoolExecutor(max_workers=1, thread_name_prefix="s2f-notify")
 
         # Text of the chunks already transcribed while the user was still
         # talking. Only ever touched from the transcription worker.
@@ -371,7 +371,7 @@ class Controller:
             sounds.error(self._cfg.feedback.sound)
             self._notify_user(
                 "error", "Microphone unavailable",
-                "Could not open the microphone — see logs/stt.log.",
+                "Could not open the microphone — see logs/s2f.log.",
             )
             return
         log.info("Recording...%s", " (auto-stops on silence)" if self._cfg.audio.auto_stop else "")
@@ -484,7 +484,7 @@ class Controller:
         except Exception:
             log.exception("Error during transcription.")
             sounds.error(self._cfg.feedback.sound)
-            self._notify_user("error", "Transcription failed", "See logs/stt.log for details.")
+            self._notify_user("error", "Transcription failed", "See logs/s2f.log for details.")
         finally:
             self._partials.clear()
             self._context = ""

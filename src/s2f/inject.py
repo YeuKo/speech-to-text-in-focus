@@ -7,7 +7,7 @@ import time
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from stt.config import InjectionConfig
+    from s2f.config import InjectionConfig
 
 log = logging.getLogger(__name__)
 

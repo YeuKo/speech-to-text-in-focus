@@ -26,8 +26,8 @@ import queue
 import threading
 from collections.abc import Callable
 
-from stt.config import OVERLAY_POSITIONS
-from stt.ui import release_default_root
+from s2f.config import OVERLAY_POSITIONS
+from s2f.ui import release_default_root
 
 log = logging.getLogger(__name__)
 
@@ -187,7 +187,7 @@ class StatusOverlay:
                 return False
             if self._thread is None or not self._thread.is_alive():
                 self._thread = threading.Thread(
-                    target=self._run, daemon=True, name="stt-overlay"
+                    target=self._run, daemon=True, name="s2f-overlay"
                 )
                 self._thread.start()
             return True

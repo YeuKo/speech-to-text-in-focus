@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "speech-to-text-in-focus"
+name = "speech-to-focus"
 version = "0.1.0"
 description = "Voice dictation for Windows with Whisper (local or OpenAI API): global hotkey and text injection at the cursor."
 readme = "README.md"
@@ -52,12 +52,12 @@ build = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/YeuKo/speech-to-text-in-focus"
-Repository = "https://github.com/YeuKo/speech-to-text-in-focus"
-Issues = "https://github.com/YeuKo/speech-to-text-in-focus/issues"
+Homepage = "https://github.com/YeuKo/speech-to-focus"
+Repository = "https://github.com/YeuKo/speech-to-focus"
+Issues = "https://github.com/YeuKo/speech-to-focus/issues"
 
 [project.scripts]
-stt = "stt.__main__:main"
+s2f = "s2f.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

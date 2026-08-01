@@ -19,11 +19,11 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from stt.audio.devices import resolve_input_device
-from stt.audio.silence import SPEECH_LEVEL
+from s2f.audio.devices import resolve_input_device
+from s2f.audio.silence import SPEECH_LEVEL
 
 if TYPE_CHECKING:
-    from stt.config import AudioConfig
+    from s2f.config import AudioConfig
 
 log = logging.getLogger(__name__)
 

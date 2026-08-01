@@ -8,7 +8,7 @@ import pytest
 
 pytest.importorskip("PIL")  # the icon is drawn with Pillow
 
-from stt.ui.tray import TrayIcon  # noqa: E402  (must come after importorskip)
+from s2f.ui.tray import TrayIcon  # noqa: E402  (must come after importorskip)
 
 
 class FakeIcon:

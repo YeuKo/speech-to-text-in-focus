@@ -1,6 +1,6 @@
 import csv
 
-from stt.usage import UsageTracker
+from s2f.usage import UsageTracker
 
 RATES = {"gpt-4o-transcribe": 0.006, "whisper-1": 0.006}
 

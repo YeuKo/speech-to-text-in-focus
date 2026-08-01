@@ -15,13 +15,13 @@ import wave
 from collections.abc import Callable
 from pathlib import Path
 
-from stt import __version__, config, logging_setup, paths, postprocess, single_instance
+from s2f import __version__, config, logging_setup, paths, postprocess, single_instance
 
-log = logging.getLogger("stt")
+log = logging.getLogger("s2f")
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(prog="stt", description="Voice dictation with Whisper.")
+    parser = argparse.ArgumentParser(prog="s2f", description="Voice dictation with Whisper.")
     parser.add_argument(
         "--config",
         type=Path,
@@ -75,7 +75,7 @@ def _fatal(title: str, message: str) -> None:
     log.error("%s: %s", title, message)
     if paths.is_frozen():
         try:
-            from stt.ui.dialogs import message_box
+            from s2f.ui.dialogs import message_box
 
             message_box(title, message, error=True)
             time.sleep(8)   # daemon thread: give the dialog time to be read
@@ -96,7 +96,7 @@ _SELFTEST_TEXT = (
 def _selftest(cfg: "config.Config") -> int:
     import numpy as np
 
-    from stt.transcribe import create_backend
+    from s2f.transcribe import create_backend
 
     log.info("=== SELF-TEST ===")
     log.info("Test text: %r", _SELFTEST_TEXT)
@@ -168,7 +168,7 @@ def _selftest(cfg: "config.Config") -> int:
 def _set_api_key() -> int:
     import getpass
 
-    from stt import keystore
+    from s2f import keystore
 
     print("Paste your OpenAI API key (it will not be shown as you type):")
     try:
@@ -195,7 +195,7 @@ def _set_api_key() -> int:
 # ---------------------------------------------------------------------------
 
 def _list_devices() -> int:
-    from stt.audio.devices import list_input_devices
+    from s2f.audio.devices import list_input_devices
 
     devices = list_input_devices()
     if not devices:
@@ -221,7 +221,7 @@ def _debug_keys(cfg: "config.Config", seconds: float = 20.0) -> int:
     """
     import keyboard
 
-    from stt.hotkey import canonical_key
+    from s2f.hotkey import canonical_key
 
     wanted = [canonical_key(k) for k in cfg.hotkey.gesture.split("+") if k.strip()]
     down: set[str] = set()
@@ -269,7 +269,7 @@ def _calibrate_mic(cfg: "config.Config", seconds: float = 5.0) -> int:
     import numpy as np
     import sounddevice as sd
 
-    from stt.audio.devices import describe_current, resolve_input_device
+    from s2f.audio.devices import describe_current, resolve_input_device
 
     sr = cfg.audio.sample_rate
     rms_values: list[float] = []
@@ -315,7 +315,7 @@ def _calibrate_mic(cfg: "config.Config", seconds: float = 5.0) -> int:
         log.warning("Try this in config.toml [audio]:  gain = %.1f", suggested)
         log.warning(
             "If that is not the microphone you speak into, list them with "
-            "'stt --list-devices' and pick one (tray menu -> Microphone)."
+            "'s2f --list-devices' and pick one (tray menu -> Microphone)."
         )
     else:
         log.info("Speech level is healthy; no extra gain needed.")
@@ -341,7 +341,7 @@ def main(argv: list[str] | None = None) -> int:
     data_dir = paths.anchor(cfg, resolved_config)
 
     logging_setup.setup(cfg.logging.level, cfg.logging.dir)
-    log.info("Speech to Text in Focus %s — backend=%s, language=%s",
+    log.info("Speech to Focus %s — backend=%s, language=%s",
              __version__, cfg.engine.backend, cfg.engine.language)
     log.info("Config: %s | data: %s", resolved_config or "defaults", data_dir)
 
@@ -363,7 +363,7 @@ def main(argv: list[str] | None = None) -> int:
     if sys.platform != "win32":
         log.error(
             "Dictation mode requires native Windows. "
-            "From WSL run: python.exe -m stt  (or use the Windows executable)."
+            "From WSL run: python.exe -m s2f  (or use the Windows executable)."
         )
         return 1
 
@@ -371,13 +371,13 @@ def main(argv: list[str] | None = None) -> int:
     if not args.allow_multiple and not single_instance.acquire():
         _fatal(
             "Already running",
-            "Speech to Text in Focus is already running — look for the microphone "
+            "Speech to Focus is already running — look for the microphone "
             "in the system tray.\n\nIf you really want a second copy (to test a "
             "different configuration), start it with --allow-multiple.",
         )
         return 3
 
-    from stt.controller import Controller
+    from s2f.controller import Controller
 
     controller = Controller(cfg)
 
@@ -385,12 +385,12 @@ def main(argv: list[str] | None = None) -> int:
     # loop (the app still works, just without the indicator).
     tray = None
     try:
-        from stt import keystore
-        from stt.config_writer import persist_value
-        from stt.ui.dialogs import ask_api_key, build_hotkey, edit_terms, message_box
-        from stt.ui.help import open_config, open_instructions, open_usage_report
-        from stt.ui.overlay import StatusOverlay
-        from stt.ui.tray import TrayIcon
+        from s2f import keystore
+        from s2f.config_writer import persist_value
+        from s2f.ui.dialogs import ask_api_key, build_hotkey, edit_terms, message_box
+        from s2f.ui.help import open_config, open_instructions, open_usage_report
+        from s2f.ui.overlay import StatusOverlay
+        from s2f.ui.tray import TrayIcon
 
         overlay = StatusOverlay(cfg.feedback.overlay_position, level=controller.audio_level)
         _template = paths.bundled_file(paths.TEMPLATE_NAME)
@@ -471,7 +471,7 @@ def main(argv: list[str] | None = None) -> int:
                     message_box(
                         "Could not save the custom words",
                         "The list is active for this session but could not be written "
-                        "to config.toml. See logs/stt.log.",
+                        "to config.toml. See logs/s2f.log.",
                         error=True,
                     )
 
@@ -526,9 +526,9 @@ def main(argv: list[str] | None = None) -> int:
             log.info("Tray icon active. Use 'Quit' in the menu to exit.")
             if controller.startup_warning:
                 try:
-                    from stt.ui.dialogs import message_box
+                    from s2f.ui.dialogs import message_box
 
-                    message_box("Speech to Text in Focus", controller.startup_warning)
+                    message_box("Speech to Focus", controller.startup_warning)
                 except Exception:
                     pass
             tray.run()  # blocks until "Quit" is chosen

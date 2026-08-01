@@ -12,7 +12,7 @@ anything the app writes goes inside it. That folder is chosen once at startup:
 1. ``--config`` if given — the user is explicit, obey.
 2. ``config.toml`` next to the executable, so an unzipped portable copy keeps
    everything together and can be deleted in one go.
-3. ``%APPDATA%\\speech-to-text-in-focus``, for when the executable's folder is read-only.
+3. ``%APPDATA%\\speech-to-focus``, for when the executable's folder is read-only.
 """
 
 from __future__ import annotations
@@ -25,11 +25,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from stt.config import Config
+    from s2f.config import Config
 
 log = logging.getLogger(__name__)
 
-APP_NAME = "speech-to-text-in-focus"
+APP_NAME = "speech-to-focus"
 CONFIG_NAME = "config.toml"
 TEMPLATE_NAME = "config.example.toml"
 
@@ -44,7 +44,7 @@ def bundle_dir() -> Path:
     meipass = getattr(sys, "_MEIPASS", None)
     if meipass:
         return Path(meipass)
-    return Path(__file__).resolve().parents[2]     # src/stt/paths.py -> repo root
+    return Path(__file__).resolve().parents[2]     # src/s2f/paths.py -> repo root
 
 
 def bundled_file(name: str) -> Path:
@@ -56,7 +56,7 @@ def app_dir() -> Path:
     """Folder the app runs from: the executable's when packaged, else the checkout.
 
     In a checkout this is the repo root rather than the current directory. Following
-    the cwd meant that starting ``stt`` from anywhere else — a shell sitting in the
+    the cwd meant that starting ``s2f`` from anywhere else — a shell sitting in the
     user's home, a shortcut — silently ignored the config.toml in the checkout and
     dropped a fresh one wherever the user happened to be standing.
 
@@ -71,7 +71,7 @@ def app_dir() -> Path:
 
 
 def user_data_dir() -> Path:
-    """``%APPDATA%\\speech-to-text-in-focus``, or its equivalent off Windows."""
+    """``%APPDATA%\\speech-to-focus``, or its equivalent off Windows."""
     appdata = os.environ.get("APPDATA")
     base = Path(appdata) if appdata else Path.home() / ".config"
     return base / APP_NAME
@@ -83,7 +83,7 @@ def is_writable(directory: Path) -> bool:
     Tested by writing, not by asking: on Windows the permission bits say little
     about what the ACLs and virtualisation will allow.
     """
-    probe = directory / ".stt-write-test"
+    probe = directory / ".s2f-write-test"
     try:
         directory.mkdir(parents=True, exist_ok=True)
         probe.touch()
@@ -122,7 +122,7 @@ def _create_from_template(destination: Path) -> Path | None:
         if template.exists():
             shutil.copy(template, destination)
         else:
-            destination.write_text("# Speech to Text in Focus configuration\n", encoding="utf-8")
+            destination.write_text("# Speech to Focus configuration\n", encoding="utf-8")
         log.info("Created %s", destination)
         return destination
     except OSError as exc:

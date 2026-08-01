@@ -6,7 +6,7 @@ feed that exact shape in.
 
 import sys
 
-from stt.audio import devices
+from s2f.audio import devices
 
 MME, DSOUND, WASAPI, WDMKS = 0, 1, 2, 3
 APIS = [

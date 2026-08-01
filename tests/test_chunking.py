@@ -11,8 +11,8 @@ import sys
 import numpy as np
 import pytest
 
-from stt.audio.recorder import Recorder
-from stt.config import AudioConfig
+from s2f.audio.recorder import Recorder
+from s2f.config import AudioConfig
 
 SR = 16000
 BLOCK = 1024                       # what sounddevice hands us each time

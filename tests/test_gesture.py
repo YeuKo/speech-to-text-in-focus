@@ -6,7 +6,7 @@ instantly and deterministically — no sleeping, no keyboard.
 
 import pytest
 
-from stt.gesture import GestureRecogniser
+from s2f.gesture import GestureRecogniser
 
 
 class FakeScheduler:

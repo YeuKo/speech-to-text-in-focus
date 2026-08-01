@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 import numpy as np
 
 if TYPE_CHECKING:
-    from stt.config import Config
+    from s2f.config import Config
 
 
 @dataclass
@@ -59,11 +59,11 @@ def create_backend(config: "Config") -> TranscriberBackend:
     """
     backend = config.engine.backend
     if backend == "local":
-        from stt.transcribe.local import LocalWhisperBackend
+        from s2f.transcribe.local import LocalWhisperBackend
 
         return LocalWhisperBackend(config)
     if backend == "openai":
-        from stt.transcribe.openai_api import OpenAIBackend
+        from s2f.transcribe.openai_api import OpenAIBackend
 
         return OpenAIBackend(config)
     raise ValueError(f"Unknown transcription backend: {backend!r}")

@@ -8,7 +8,7 @@ the cases below are taken from a real Spanish machine's --debug-keys output.
 
 import pytest
 
-from stt.hotkey import canonical_key
+from s2f.hotkey import canonical_key
 
 
 class TestSpanishWindows:

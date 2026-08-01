@@ -11,9 +11,10 @@ import os
 
 log = logging.getLogger(__name__)
 
-SERVICE = "stt-dictation"   # kept stable across renames: it is the
-                            # key under which Windows already stores the
-                            # secret, and changing it would orphan it
+SERVICE = "stt-dictation"   # deliberately not "s2f": it is the key under which
+                            # Windows already stores the secret, so renaming the
+                            # app (it was "stt-dictation" once) must not touch it
+                            # or every existing user loses their saved API key
 USERNAME = "openai_api_key"
 
 

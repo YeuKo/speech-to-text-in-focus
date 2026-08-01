@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Run Speech to Text in Focus straight from this checkout.
+    Run Speech to Focus straight from this checkout.
 
 .DESCRIPTION
     Sets up .venv on the first run and starts the app. Everything lives inside the
@@ -117,7 +117,7 @@ try {
     # Reinstall only when the dependency list actually changed. Hashing pyproject.toml
     # is what makes `git pull; .\run.ps1` cheap on the common day, where nothing but
     # the source changed and editable mode has already picked it up.
-    $stamp = Join-Path $venv '.stt-deps-hash'
+    $stamp = Join-Path $venv '.s2f-deps-hash'
     $fingerprint = (Get-FileHash (Join-Path $PSScriptRoot 'pyproject.toml') -Algorithm SHA256).Hash
     $installed = if (Test-Path $stamp) { (Get-Content $stamp -Raw).Trim() } else { '' }
 
@@ -132,10 +132,10 @@ try {
         Write-Note 'No config.toml: running on factory settings. Copy config.example.toml to change that.'
     }
 
-    Write-Step 'Starting Speech to Text in Focus - look for the microphone in the system tray'
+    Write-Step 'Starting Speech to Focus - look for the microphone in the system tray'
     Write-Note 'On the very first run the speech model is downloaded (0.5-1.6 GB). Ctrl+C here quits.'
 
-    & $venvPython '-m' 'stt' @AppArgs
+    & $venvPython '-m' 's2f' @AppArgs
     exit $LASTEXITCODE
 } finally {
     Pop-Location

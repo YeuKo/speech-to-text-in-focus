@@ -16,25 +16,25 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from stt.audio.silence import trim_silence
-from stt.transcribe.base import TranscriptionResult
+from s2f.audio.silence import trim_silence
+from s2f.transcribe.base import TranscriptionResult
 
 if TYPE_CHECKING:
-    from stt.config import Config
+    from s2f.config import Config
 
 log = logging.getLogger(__name__)
 
 
 def _resolve_api_key(env_name: str) -> str:
     """Get the API key from the environment variable or keyring."""
-    from stt import keystore
+    from s2f import keystore
 
     key = os.environ.get(env_name) or keystore.get_api_key()
     if key:
         return key
     raise RuntimeError(
         f"OpenAI API key not found. Set the {env_name} environment variable, "
-        "run 'stt --set-api-key', or use the tray menu 'Set OpenAI API key…'."
+        "run 's2f --set-api-key', or use the tray menu 'Set OpenAI API key…'."
     )
 
 
@@ -65,7 +65,7 @@ class OpenAIBackend:
         api_key = _resolve_api_key(self._cfg.openai.api_key_env)
         self._client = OpenAI(api_key=api_key)
         if self._cfg.usage.track:
-            from stt.usage import UsageTracker
+            from s2f.usage import UsageTracker
 
             self._usage = UsageTracker(self._cfg.usage.file, self._cfg.usage.price_per_min)
             log.info("Cost tracking enabled. Running total: $%.4f", self._usage.total)

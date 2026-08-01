@@ -2,8 +2,8 @@
 
 import pytest
 
-from stt.config import OVERLAY_POSITIONS
-from stt.ui.overlay import _MARGIN, _place
+from s2f.config import OVERLAY_POSITIONS
+from s2f.ui.overlay import _MARGIN, _place
 
 # A 1920x1080 screen with a 40 px taskbar along the bottom.
 AREA = (0, 0, 1920, 1040)

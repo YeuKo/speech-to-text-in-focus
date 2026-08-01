@@ -1,4 +1,4 @@
-# Speech to Text in Focus configuration.
+# Speech to Focus configuration.
 # Copy this file to "config.toml" and adjust it. config.toml is in .gitignore.
 
 [engine]
@@ -26,7 +26,7 @@ compute_type = "auto"
 # API model: "gpt-4o-transcribe", "gpt-4o-mini-transcribe" or "whisper-1".
 model = "gpt-4o-transcribe"
 # Name of the environment variable holding the API key (do NOT put the key here).
-# To store it securely without touching this file: "stt --set-api-key".
+# To store it securely without touching this file: "s2f --set-api-key".
 api_key_env = "OPENAI_API_KEY"
 # Trim silence before sending to the API. The API bills by audio duration
 # (silence included), so this makes dictation with long pauses cheaper.
@@ -76,12 +76,12 @@ sample_rate = 16000            # Whisper works at 16 kHz
 channels = 1
 # Which microphone to record from. "auto" follows the Windows default — which is
 # often NOT the one you talk into (a headset left plugged in wins over the laptop
-# array). Put part of a device name here, list them with "stt --list-devices", or
+# array). Put part of a device name here, list them with "s2f --list-devices", or
 # pick one from the tray menu -> Microphone.
 input_device = "auto"
 # Input gain applied while recording. Raise it if you have to lean into the
 # microphone to be heard: it also makes speech detection more sensitive, since
-# that is what decides when you started talking. "stt --calibrate-mic" measures
+# that is what decides when you started talking. "s2f --calibrate-mic" measures
 # your voice and suggests a value.
 gain = 1.0
 # Even out the volume before transcribing, so speech from across the room reaches
@@ -117,7 +117,7 @@ chunk_context = true
 # Recommended: adapts on its own to any microphone and environment, no calibration.
 auto_threshold = true
 # Fixed threshold (RMS, 0-1), used ONLY when auto_threshold = false.
-# To tune it manually: "stt --calibrate-mic".
+# To tune it manually: "s2f --calibrate-mic".
 silence_threshold = 0.006
 
 [injection]

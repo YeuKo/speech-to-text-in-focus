@@ -1,6 +1,6 @@
 import numpy as np
 
-from stt.audio.silence import has_speech, normalise_level, trim_silence
+from s2f.audio.silence import has_speech, normalise_level, trim_silence
 
 SR = 16000
 

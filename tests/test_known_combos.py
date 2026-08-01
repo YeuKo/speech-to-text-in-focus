@@ -1,4 +1,4 @@
-from stt.ui import known_combos as kc
+from s2f.ui import known_combos as kc
 
 
 class TestNormalise:

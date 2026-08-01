@@ -1,6 +1,6 @@
 import tomllib
 
-from stt.config_writer import persist_hotkey, persist_value
+from s2f.config_writer import persist_hotkey, persist_value
 
 SAMPLE = '''[hotkey]
 toggle = "ctrl+alt+space"      # press to start/stop

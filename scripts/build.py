@@ -1,7 +1,7 @@
 """Build the portable Windows release:  python scripts/build.py
 
-Produces dist/speech-to-text-in-focus/ (the folder you can run from anywhere) and
-dist/speech-to-text-in-focus-<version>-win64.zip (what gets attached to a GitHub release).
+Produces dist/speech-to-focus/ (the folder you can run from anywhere) and
+dist/speech-to-focus-<version>-win64.zip (what gets attached to a GitHub release).
 
 Must run on Windows with the runtime dependencies installed, since PyInstaller
 collects what it finds in the current environment:
@@ -18,14 +18,14 @@ import zipfile
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-SPEC = REPO / "packaging" / "stt.spec"
+SPEC = REPO / "packaging" / "s2f.spec"
 DIST = REPO / "dist"
 BUILD = REPO / "build"
 
 
 def _version() -> str:
     sys.path.insert(0, str(REPO / "src"))
-    from stt import __version__
+    from s2f import __version__
 
     return __version__
 
@@ -49,12 +49,12 @@ def main() -> int:
         return 1
 
     version = _version()
-    print(f"Building Speech to Text in Focus {version}\n")
+    print(f"Building Speech to Focus {version}\n")
 
     # Regenerate the icon so the executable never ships a stale one.
     subprocess.run([sys.executable, str(REPO / "scripts" / "make_icon.py")], check=True)
 
-    for stale in (BUILD, DIST / "speech-to-text-in-focus"):
+    for stale in (BUILD, DIST / "speech-to-focus"):
         if stale.exists():
             shutil.rmtree(stale)
 
@@ -63,21 +63,21 @@ def main() -> int:
         cwd=REPO, check=True,
     )
 
-    folder = DIST / "speech-to-text-in-focus"
-    exe = folder / "stt.exe"
+    folder = DIST / "speech-to-focus"
+    exe = folder / "s2f.exe"
     if not exe.exists():
         print(f"Build finished but {exe} is missing.", file=sys.stderr)
         return 1
 
     total = sum(p.stat().st_size for p in folder.rglob("*") if p.is_file())
-    archive = DIST / f"speech-to-text-in-focus-{version}-win64.zip"
+    archive = DIST / f"speech-to-focus-{version}-win64.zip"
     archive.unlink(missing_ok=True)
     print(f"\nZipping {_human(total)} into {archive.name}…")
     _zip(folder, archive)
 
     print(f"\n  folder : {folder}  ({_human(total)})")
     print(f"  archive: {archive}  ({_human(archive.stat().st_size)})")
-    print("\nTo check it: run dist\\speech-to-text-in-focus\\stt.exe and look for the "
+    print("\nTo check it: run dist\\speech-to-focus\\s2f.exe and look for the "
           "microphone in the tray.")
     return 0
 

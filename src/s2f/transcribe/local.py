@@ -8,11 +8,11 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from stt import hardware
-from stt.transcribe.base import TranscriptionResult
+from s2f import hardware
+from s2f.transcribe.base import TranscriptionResult
 
 if TYPE_CHECKING:
-    from stt.config import Config
+    from s2f.config import Config
 
 log = logging.getLogger(__name__)
 
