@@ -16,8 +16,11 @@ import logging
 
 log = logging.getLogger(__name__)
 
-# Global\ makes it machine-wide rather than per-session. The name is arbitrary
-# but must not change: it is the handshake between two copies of the app.
+# Global\ makes it machine-wide rather than per-session. The name is arbitrary,
+# but two copies only recognise each other while they agree on it: renaming it
+# means a copy started before the change and one started after both think they
+# are alone. That window closes at the next reboot, since the mutex dies with
+# the process — unlike keystore.SERVICE, which holds a secret and must never move.
 _MUTEX_NAME = r"Global\s2f-dictation-single-instance"
 
 _ERROR_ALREADY_EXISTS = 183

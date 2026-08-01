@@ -65,15 +65,32 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def _has_console() -> bool:
+    """Whether anything printed to stderr can actually be read by someone.
+
+    A shortcut that starts the app with ``pythonw`` has no console, exactly like
+    a packaged build: ``sys.stderr`` is None there and printing to it is a no-op.
+    When the check itself is unavailable, assume there is no console — a dialog
+    nobody needed is a smaller failure than the only warning going unseen.
+    """
+    try:
+        import ctypes
+
+        return bool(ctypes.windll.kernel32.GetConsoleWindow())
+    except Exception:
+        return False
+
+
 def _fatal(title: str, message: str) -> None:
     """Report a startup failure through every channel available.
 
-    A packaged build runs without a console, so a message on stderr would vanish;
-    the dialog is the only thing the user would ever see.
+    With no console — a packaged build, or a shortcut launched with ``pythonw`` —
+    a message on stderr would vanish; the dialog is the only thing the user would
+    ever see.
     """
     print(f"{title}: {message}", file=sys.stderr)
     log.error("%s: %s", title, message)
-    if paths.is_frozen():
+    if paths.is_frozen() or not _has_console():
         try:
             from s2f.ui.dialogs import message_box
 
